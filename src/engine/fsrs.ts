@@ -219,25 +219,56 @@ export function previewIntervals(
   };
 }
 
-export function scheduleCard(
+export function scheduleCardWithPreview(
   card: StudyCard,
   rating: Rating,
   nowMs = Date.now(),
   leechThreshold = 3,
-): StudyCard {
-  const { next } = computeNextFSRS(card.fsrs, rating, nowMs);
+): { card: StudyCard; label: string } {
+  const { next, label } = computeNextFSRS(card.fsrs, rating, nowMs);
   const becameLeech = card.isLeech || next.lapses >= leechThreshold;
   const tags = [...card.tags];
   if (becameLeech && !tags.includes('leech')) {
     tags.push('leech');
   }
   return {
-    ...card,
-    fsrs: next,
-    isLeech: becameLeech,
-    tags,
-    updatedAt: nowMs,
+    card: {
+      ...card,
+      fsrs: next,
+      isLeech: becameLeech,
+      tags,
+      updatedAt: nowMs,
+    },
+    label,
   };
+}
+
+export function scheduleCard(
+  card: StudyCard,
+  rating: Rating,
+  nowMs = Date.now(),
+  leechThreshold = 3,
+): StudyCard {
+  return scheduleCardWithPreview(card, rating, nowMs, leechThreshold).card;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function shuffleArray<T>(items: T[], rng: () => number): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 function comparePriority(a: StudyCard, b: StudyCard): number {
@@ -261,6 +292,8 @@ export function buildStudyQueue(
     tierFilter?: FrequencyTier | 'all';
     topicFilter?: string;
     leechThreshold?: number;
+    shuffle?: boolean;
+    seed?: number;
   } = {},
 ): StudyCard[] {
   const nowMs = opts.nowMs ?? Date.now();
@@ -268,6 +301,8 @@ export function buildStudyQueue(
   const tierFilter = opts.tierFilter ?? 'all';
   const topicFilter = (opts.topicFilter ?? '').trim().toLowerCase();
   const leechThreshold = opts.leechThreshold ?? 3;
+  const shouldShuffle = opts.shuffle ?? false;
+  const rng = mulberry32(opts.seed ?? nowMs);
 
   const filtered = cards.filter((c) => {
     if (tierFilter !== 'all' && c.frequencyTier !== tierFilter) return false;
@@ -276,12 +311,25 @@ export function buildStudyQueue(
   });
 
   if (mode === 'leech') {
-    return filtered
+    const leeches = filtered
       .filter((c) => c.isLeech || c.fsrs.lapses >= leechThreshold)
       .sort((a, b) => b.fsrs.lapses - a.fsrs.lapses || comparePriority(a, b));
+    return shouldShuffle ? shuffleArray(leeches, rng) : leeches;
   }
 
   if (mode === 'sprint') {
+    if (shouldShuffle) {
+      const buckets: StudyCard[][] = [[], [], [], []];
+      for (const c of filtered) {
+        if (c.sourceKind !== 'past_exam') {
+          buckets[3].push(c);
+        } else {
+          const rank = TIER_RANK[c.frequencyTier] ?? 2;
+          buckets[Math.min(3, Math.max(0, rank))].push(c);
+        }
+      }
+      return buckets.flatMap((bucket) => shuffleArray(bucket, rng));
+    }
     return [...filtered].sort((a, b) => {
       const p = comparePriority(a, b);
       if (p !== 0) return p;
@@ -290,17 +338,19 @@ export function buildStudyQueue(
     });
   }
 
-  // Standard FSRS queue: due learning/review first, then priority-sorted new cards up to dailyNewLimit
+  // Standard FSRS queue: due learning/review first, then priority-sorted (or shuffled) new cards up to dailyNewLimit
   const dueCards = filtered
     .filter((c) => c.fsrs.state !== 'new' && c.fsrs.due <= nowMs)
     .sort((a, b) => a.fsrs.due - b.fsrs.due || comparePriority(a, b));
+  const orderedDue = shouldShuffle ? shuffleArray(dueCards, rng) : dueCards;
 
-  const newCards = filtered
+  const eligibleNew = filtered
     .filter((c) => c.fsrs.state === 'new')
-    .sort(comparePriority)
-    .slice(0, Math.max(0, dailyNewLimit));
+    .sort(comparePriority);
+  const newPool = shouldShuffle ? shuffleArray(eligibleNew, rng) : eligibleNew;
+  const newCards = newPool.slice(0, Math.max(0, dailyNewLimit));
 
-  return [...dueCards, ...newCards];
+  return [...orderedDue, ...newCards];
 }
 
 export function computeExamPace(

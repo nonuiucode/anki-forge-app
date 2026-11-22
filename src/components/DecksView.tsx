@@ -2,11 +2,17 @@ import { useRef, useState } from 'react';
 
 import { computeExamPace } from '../engine/fsrs';
 import type { DeckRecord, StudyCard, StudyMode } from '../types';
+import { MarineHeroCover } from './DeckThemeArt';
 
 interface DecksViewProps {
   decks: DeckRecord[];
   cards: StudyCard[];
   dailyNewLimit: number;
+  todayReviewed: number;
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+  onToggleShuffleQuestions: () => void;
+  onToggleShuffleOptions: () => void;
   onImportFiles: (files: FileList) => void;
   onLoadDemo: () => void;
   onStartStudy: (deckId: string, mode: StudyMode) => void;
@@ -19,6 +25,11 @@ export function DecksView({
   decks,
   cards,
   dailyNewLimit,
+  todayReviewed,
+  shuffleQuestions,
+  shuffleOptions,
+  onToggleShuffleQuestions,
+  onToggleShuffleOptions,
   onImportFiles,
   onLoadDemo,
   onStartStudy,
@@ -32,9 +43,22 @@ export function DecksView({
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const nowMs = Date.now();
+  const dueTotal = cards.filter(
+    (c) => c.fsrs.state === 'new' || c.fsrs.due <= nowMs,
+  ).length;
 
   return (
     <>
+      <MarineHeroCover
+        totalCards={cards.length}
+        todayReviewed={todayReviewed}
+        dueTotal={dueTotal}
+        shuffleQuestions={shuffleQuestions}
+        shuffleOptions={shuffleOptions}
+        onToggleShuffleQuestions={onToggleShuffleQuestions}
+        onToggleShuffleOptions={onToggleShuffleOptions}
+      />
+
       <div className="card-panel">
         <div className="row-between">
           <div>

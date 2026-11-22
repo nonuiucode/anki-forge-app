@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DecksView } from './components/DecksView';
+import { SilverAppleLogo } from './components/DeckThemeArt';
 import { LeechView } from './components/LeechView';
 import { StatsView } from './components/StatsView';
 import { StudyView } from './components/StudyView';
 import { exportApkg, exportLeechJson, importApkg, importDeckJson } from './engine/apkgCodec';
-import { buildStudyQueue, scheduleCard } from './engine/fsrs';
+import { buildStudyQueue, scheduleCardWithPreview } from './engine/fsrs';
 import { shareOrDownloadBytes, shareOrDownloadText, subscribeIncomingFiles } from './native/androidBridge';
 import {
   DEFAULT_SETTINGS,
@@ -51,6 +52,7 @@ export function App() {
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
   const [studyMode, setStudyMode] = useState<StudyMode>('fsrs');
   const [tierFilter, setTierFilter] = useState<FrequencyTier | 'all'>('all');
+  const [sessionId, setSessionId] = useState(1);
   const [sessionQueue, setSessionQueue] = useState<StudyCard[]>([]);
 
   const showToast = useCallback((msg: string) => {
@@ -96,7 +98,7 @@ export function App() {
         (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', dark ? '#0b1120' : '#f7f6f2');
+      if (meta) meta.setAttribute('content', dark ? '#071324' : '#eff4f9');
     };
     applyTheme();
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -181,14 +183,17 @@ export function App() {
         dailyNewLimit: settings.dailyNewLimit,
         tierFilter: overrideTier,
         leechThreshold: settings.leechThreshold,
+        shuffle: settings.shuffleQuestions,
+        seed: Date.now(),
       });
       setActiveDeckId(deckId);
       setStudyMode(mode);
       setTierFilter(overrideTier);
+      setSessionId((prev) => prev + 1);
       setSessionQueue(q);
       setTab('study');
     },
-    [cards, settings.dailyNewLimit, settings.leechThreshold],
+    [cards, settings.dailyNewLimit, settings.leechThreshold, settings.shuffleQuestions],
   );
 
   const handleChangeTierFilter = useCallback(
@@ -196,22 +201,37 @@ export function App() {
       setTierFilter(nextTier);
       if (activeDeckId) {
         const deckCards = cards.filter((c) => c.deckId === activeDeckId);
+        setSessionId((prev) => prev + 1);
         setSessionQueue(
           buildStudyQueue(deckCards, studyMode, {
             dailyNewLimit: settings.dailyNewLimit,
             tierFilter: nextTier,
             leechThreshold: settings.leechThreshold,
+            shuffle: settings.shuffleQuestions,
+            seed: Date.now(),
           }),
         );
       }
     },
-    [activeDeckId, cards, studyMode, settings.dailyNewLimit, settings.leechThreshold],
+    [
+      activeDeckId,
+      cards,
+      studyMode,
+      settings.dailyNewLimit,
+      settings.leechThreshold,
+      settings.shuffleQuestions,
+    ],
   );
 
   const handleRateCard = useCallback(
-    async (card: StudyCard, rating: Rating, elapsedMs: number) => {
+    async (card: StudyCard, rating: Rating, elapsedMs: number): Promise<{ label: string }> => {
       const nowMs = Date.now();
-      const updated = scheduleCard(card, rating, nowMs, settings.leechThreshold);
+      const { card: updated, label } = scheduleCardWithPreview(
+        card,
+        rating,
+        nowMs,
+        settings.leechThreshold,
+      );
       const log: ReviewLogEntry = {
         id: `${nowMs}-${card.guid}`,
         guid: card.guid,
@@ -221,8 +241,10 @@ export function App() {
         reviewedAt: nowMs,
       };
       setCards((prev) => prev.map((c) => (c.guid === updated.guid ? updated : c)));
+      setSessionQueue((prev) => prev.map((c) => (c.guid === updated.guid ? updated : c)));
       setLogs((prev) => [...prev, log]);
       await saveCardAndLog(updated, log);
+      return { label };
     },
     [settings.leechThreshold],
   );
@@ -313,6 +335,13 @@ export function App() {
     [decks, activeDeckId],
   );
 
+  const todayReviewed = useMemo(() => {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const cutoff = startOfDay.getTime();
+    return logs.filter((l) => l.reviewedAt >= cutoff).length;
+  }, [logs]);
+
   const isDark =
     settings.theme === 'dark' ||
     (settings.theme === 'system' &&
@@ -331,9 +360,12 @@ export function App() {
       }}
     >
       <header className="top-bar">
-        <div>
-          <h1 className="top-title">玖记</h1>
-          <div className="top-sub">真题考频 · FSRS 复习 · 卡壳助记闭环</div>
+        <div className="top-brand">
+          <SilverAppleLogo size={34} />
+          <div>
+            <h1 className="top-title">玖记</h1>
+            <div className="top-sub">真题考频 · FSRS 自动归档 · 乱序记忆</div>
+          </div>
         </div>
         <button
           type="button"
@@ -345,7 +377,7 @@ export function App() {
             })
           }
         >
-          {isDark ? '浅色' : '暗夜'}
+          {isDark ? '晴海' : '深海'}
         </button>
       </header>
 
@@ -357,6 +389,21 @@ export function App() {
             decks={decks}
             cards={cards}
             dailyNewLimit={settings.dailyNewLimit}
+            todayReviewed={todayReviewed}
+            shuffleQuestions={settings.shuffleQuestions}
+            shuffleOptions={settings.shuffleOptions}
+            onToggleShuffleQuestions={() =>
+              void handleUpdateSettings({
+                ...settings,
+                shuffleQuestions: !settings.shuffleQuestions,
+              })
+            }
+            onToggleShuffleOptions={() =>
+              void handleUpdateSettings({
+                ...settings,
+                shuffleOptions: !settings.shuffleOptions,
+              })
+            }
             onImportFiles={(f) => void handleImportFiles(f)}
             onLoadDemo={() => void handleLoadDemo()}
             onStartStudy={(id, mode) => startStudySession(id, mode)}
@@ -369,13 +416,15 @@ export function App() {
         {tab === 'study' && (
           <StudyView
             deckName={activeDeck?.name ?? '复习'}
+            sessionId={sessionId}
             mode={studyMode}
             queue={sessionQueue}
             mediaUrls={mediaUrls}
             tierFilter={tierFilter}
             showIntervals={settings.showIntervals}
+            shuffleOptions={settings.shuffleOptions}
             onChangeTierFilter={handleChangeTierFilter}
-            onRateCard={(c, r, ms) => void handleRateCard(c, r, ms)}
+            onRateCard={(c, r, ms) => handleRateCard(c, r, ms)}
             onUpdateMnemonic={(c, mn) => void handleUpdateMnemonic(c, mn)}
             onExit={() => setTab('decks')}
           />
@@ -412,7 +461,7 @@ export function App() {
             className={`nav-item ${tab === 'decks' ? 'active' : ''}`}
             onClick={() => setTab('decks')}
           >
-            <span className="nav-icon">◫</span>
+            <span className="nav-icon">♠</span>
             <span>牌组</span>
           </button>
           <button
@@ -429,7 +478,7 @@ export function App() {
               }
             }}
           >
-            <span className="nav-icon">▸</span>
+            <span className="nav-icon">♦</span>
             <span>复习</span>
           </button>
           <button
@@ -437,7 +486,7 @@ export function App() {
             className={`nav-item ${tab === 'leech' ? 'active' : ''}`}
             onClick={() => setTab('leech')}
           >
-            <span className="nav-icon">!</span>
+            <span className="nav-icon">♥</span>
             <span>卡壳本</span>
           </button>
           <button
@@ -445,7 +494,7 @@ export function App() {
             className={`nav-item ${tab === 'stats' ? 'active' : ''}`}
             onClick={() => setTab('stats')}
           >
-            <span className="nav-icon">▤</span>
+            <span className="nav-icon">♣</span>
             <span>统计</span>
           </button>
         </div>

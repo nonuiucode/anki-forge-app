@@ -2,7 +2,7 @@
 
 [中文文档](README.zh.md)
 
-**玖记 (Jiuji)** is an **offline-first Android native APK & Web/PWA flashcard companion** for [anki-exam-forge](https://github.com/nonuiucode/anki-exam-forge). Opens `.apkg` and `deck.json` files directly from Android system intents/share sheets, schedules cards with **FSRS-5**, prioritizes past-exam frequency tiers, renders interactive MCQ/Cloze/zoomable diagrams, and exports stuck (`leech`) cards back for mnemonic repair.
+**玖记 (Jiuji)** is an **offline-first Android native APK & Web/PWA flashcard companion** for [anki-exam-forge](https://github.com/nonuiucode/anki-exam-forge). Opens `.apkg` and `deck.json` files directly from Android system intents/share sheets, automatically schedules MCQs with **FSRS-5**, shuffles both question order and MCQ options, supports touch swipe navigation, prioritizes past-exam frequency tiers, renders zoomable medical diagrams, and exports stuck (`leech`) cards back for mnemonic repair.
 
 ## Key Features
 
@@ -10,11 +10,12 @@
 - **Native Android File Association & Share Sheet**:
   - Registers `ACTION_VIEW` and `ACTION_SEND` intent filters so tapping `.apkg` or `deck.json` inside WeChat, QQ, Telegram, or Android Files opens directly in **玖记** (Android launcher name: `玖记`), updating existing notes in place by `guid` without losing review progress.
   - One-tap export of `leech-*.json` or scheduling-aware `.apkg` via Android `FileProvider` share sheet.
-- **FSRS-5 + Exam Frequency Sprint**:
-  - Standard FSRS-5 4-button rating with live interval previews.
-  - **Exam Sprint Mode** surfaces `high -> medium -> low -> supplement` cards first, paired with an exam countdown daily-pace estimator.
-- **Interactive Card Types & Eye-Care UI**:
-  - Single-choice tap-to-grade and X-type multi-select MCQs (checkbox toggle + submit-to-grade with per-option correct/missed/wrong breakdown, stem-first diagram placement), per-blank peekable Cloze deletions, full-screen `1× / 1.75× / 2.5×` diagram lightbox, inline mnemonic editing, 90-day SVG heatmap, and Warm Paper Light / Deep Slate Dark themes.
+- **Automatic FSRS-5 Scheduling & Dual Shuffling**:
+  - **Auto-scheduled MCQs**: After picking a single-choice answer or submitting an X-type multi-select card, FSRS-5 interval grading is computed automatically from verdict (`correct` / `partial` / `wrong`) and response time — no repetitive 4-button rating step required after every MCQ (while Basic & Cloze cards keep the 4-button FSRS bar).
+  - **Question & Option Shuffling**: Both deck question queues (with within-tier shuffling in Exam Sprint mode) and MCQ answer choices shuffle cleanly per session (automatically skipping positional-reference options like `"All of the above"` / `"以上均正确"`), displaying original option tags (`原X`) after reveal.
+- **Touch Swipe Navigation & UI Polish**:
+  - Horizontal touch swipe left/right between previous and next cards with vertical-scroll protection and per-session answer preservation (swiping back never double-logs reviews).
+  - Single-choice tap-to-grade and X-type multi-select MCQs (checkbox toggle + submit-to-grade with per-option correct/missed/wrong breakdown, stem-first diagram placement), per-blank peekable Cloze deletions, full-screen `1× / 1.75× / 2.5×` diagram lightbox, 90-day SVG heatmap, and eye-care light/dark UI polish.
 
 ## Cloud APK Compilation (GitHub Actions)
 
@@ -25,7 +26,7 @@ No local Android Studio or SDK is required. On every push to `main`, PR, or `v*`
 ```bash
 npm install
 npm run dev      # Local browser preview (supports drag-and-drop .apkg / deck.json)
-npm test         # Run Vitest suite (FSRS-5 + offline .apkg codec + cross-repo interop)
+npm test         # Run Vitest suite (FSRS-5 + MCQ shuffling/auto-rating + offline .apkg interop)
 npm run cap:sync # Typecheck, bundle Vite, and sync assets into android/
 ```
 

@@ -72,6 +72,8 @@ export interface AppSettings {
   leechThreshold: number;
   dailyNewLimit: number;
   showIntervals: boolean;
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
 }
 
 export interface ImportResult {

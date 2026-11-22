@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   leechThreshold: 3,
   dailyNewLimit: 30,
   showIntervals: true,
+  shuffleQuestions: true,
+  shuffleOptions: true,
 };
 
 function openDb(): Promise<IDBDatabase> {

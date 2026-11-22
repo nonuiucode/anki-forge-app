@@ -163,9 +163,35 @@ export function StatsView({
               }
             >
               <option value="system">跟随系统</option>
-              <option value="light">暖纸浅色</option>
-              <option value="dark">深蓝暗夜</option>
+              <option value="light">晴海银波（浅色）</option>
+              <option value="dark">深海月光（暗夜）</option>
             </select>
+          </div>
+
+          <div className="row-between">
+            <span style={{ fontSize: 14 }}>题目乱序出题</span>
+            <input
+              type="checkbox"
+              aria-label="题目乱序出题"
+              style={{ width: 20, height: 20, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              checked={settings.shuffleQuestions}
+              onChange={(e) =>
+                onUpdateSettings({ ...settings, shuffleQuestions: e.target.checked })
+              }
+            />
+          </div>
+
+          <div className="row-between">
+            <span style={{ fontSize: 14 }}>选择题选项乱序</span>
+            <input
+              type="checkbox"
+              aria-label="选择题选项乱序"
+              style={{ width: 20, height: 20, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              checked={settings.shuffleOptions}
+              onChange={(e) =>
+                onUpdateSettings({ ...settings, shuffleOptions: e.target.checked })
+              }
+            />
           </div>
 
           <div className="row-between">

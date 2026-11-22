@@ -6,6 +6,7 @@ import {
   createInitialFSRS,
   previewIntervals,
   scheduleCard,
+  scheduleCardWithPreview,
 } from '../fsrs';
 import type { StudyCard } from '../../types';
 
@@ -103,5 +104,51 @@ describe('FSRS-5 scheduler & queue prioritization', () => {
     expect(pace.unmasteredCount).toBe(2);
     expect(pace.daysLeft).toBeGreaterThanOrEqual(4);
     expect(pace.suggestedDaily).toBe(1);
+  });
+
+  it('supports seeded question shuffling across fsrs, sprint (within tiers), and leech modes', () => {
+    const now = 1_700_000_000_000;
+    const cards: StudyCard[] = Array.from({ length: 12 }, (_, idx) =>
+      makeCard({
+        guid: `guid-${idx + 1}`,
+        cardId: `q-${String(idx + 1).padStart(2, '0')}`,
+        frequencyTier: idx < 4 ? 'high' : idx < 8 ? 'medium' : 'low',
+        frequency: idx < 4 ? 5 : idx < 8 ? 2 : 1,
+        isLeech: idx >= 8,
+        fsrs: {
+          ...createInitialFSRS(now),
+          lapses: idx >= 8 ? idx : 0,
+        },
+      }),
+    );
+
+    const fsrsOrdered = buildStudyQueue(cards, 'fsrs', { nowMs: now, dailyNewLimit: 4, shuffle: false });
+    expect(fsrsOrdered.map((c) => c.cardId)).toEqual(['q-01', 'q-02', 'q-03', 'q-04']);
+
+    // FSRS with shuffle=true samples across the entire new pool before dailyNewLimit slicing
+    const fsrsShuffled = buildStudyQueue(cards, 'fsrs', {
+      nowMs: now,
+      dailyNewLimit: 4,
+      shuffle: true,
+      seed: 20261122,
+    });
+    expect(fsrsShuffled).toHaveLength(4);
+    expect(fsrsShuffled.map((c) => c.cardId)).not.toEqual(['q-01', 'q-02', 'q-03', 'q-04']);
+
+    // Sprint with shuffle=true keeps tier ordering (all high before medium before low) while shuffling within tiers
+    const sprintShuffled = buildStudyQueue(cards, 'sprint', {
+      nowMs: now,
+      shuffle: true,
+      seed: 20261122,
+    });
+    expect(sprintShuffled.slice(0, 4).every((c) => c.frequencyTier === 'high')).toBe(true);
+    expect(sprintShuffled.slice(4, 8).every((c) => c.frequencyTier === 'medium')).toBe(true);
+    expect(sprintShuffled.slice(8, 12).every((c) => c.frequencyTier === 'low')).toBe(true);
+    expect(sprintShuffled.map((c) => c.cardId)).not.toEqual(cards.map((c) => c.cardId));
+
+    // scheduleCardWithPreview returns updated card and non-empty interval label
+    const rated = scheduleCardWithPreview(cards[0], 3, now, 3);
+    expect(rated.card.fsrs.state).toBe('review');
+    expect(rated.label).toContain('天');
   });
 });
