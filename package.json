@@ -1,0 +1,39 @@
+{
+  "name": "anki-forge-app",
+  "version": "1.0.0",
+  "description": "Offline-first Android & Web Anki companion app for anki-exam-forge: .apkg & deck.json reader, FSRS-5 spaced repetition, exam-frequency sprint, interactive MCQ/Cloze, leech export, and minimalist eye-care UI.",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "author": "nonuiucode",
+  "homepage": "https://github.com/nonuiucode/anki-forge-app#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nonuiucode/anki-forge-app.git"
+  },
+  "scripts": {
+    "postinstall": "node --input-type=module -e \"import {mkdirSync,copyFileSync} from 'node:fs';mkdirSync('public',{recursive:true});copyFileSync('node_modules/sql.js/dist/sql-wasm.wasm','public/sql-wasm.wasm');\"",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "cap:sync": "npm run build && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/core": "^7.4.0",
+    "jszip": "^3.10.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}

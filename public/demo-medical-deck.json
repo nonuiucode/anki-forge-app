@@ -1,0 +1,88 @@
+{
+  "deck_name": "临床医学::考研与期末真题高频库（示例）",
+  "subject_preset": "clinical-medicine",
+  "cards": [
+    {
+      "card_id": "demo-radial-nerve",
+      "card_type": "basic",
+      "concept_key": "桡神经损伤临床表现",
+      "topic": "系统解剖学::上肢神经",
+      "frequency": 4,
+      "frequency_tier": "high",
+      "frequency_badge": "高频 · 4次",
+      "source_kind": "past_exam",
+      "source_years": ["2019", "2021", "2023", "2025"],
+      "front": "肱骨中段骨折最易损伤哪条神经？典型畸形与感觉障碍区是？",
+      "back": "桡神经损伤；典型表现为“垂腕”畸形，虎口区（手背第1、2掌骨间）皮肤感觉减退或消失。",
+      "explanation": "桡神经紧贴肱骨中段桡神经沟下行，损伤后前臂伸肌群瘫痪致伸腕、伸指不能。",
+      "mnemonic": "【口诀/缩略】“肱中桡腕垂，尺爪正猿手”—— 肱骨中段贴桡神经，损伤垂腕虎口麻。",
+      "tags": ["freq::high", "course::系统解剖学"]
+    },
+    {
+      "card_id": "demo-htn-acei",
+      "card_type": "basic",
+      "concept_key": "高血压伴糖尿病或蛋白尿首选降压药",
+      "topic": "内科学::循环系统",
+      "frequency": 3,
+      "frequency_tier": "high",
+      "frequency_badge": "高频 · 3次",
+      "source_kind": "past_exam",
+      "source_years": ["2020", "2022", "2024"],
+      "front": "高血压合并糖尿病或慢性肾病（伴蛋白尿）时，首选哪类降压药？",
+      "back": "ACEI（普利类）或 ARB（沙坦类）。",
+      "explanation": "可扩张出球小动脉、降低肾小球囊内压并减少尿蛋白排泄；双侧肾动脉狭窄、高钾血症及妊娠禁用。",
+      "tags": ["freq::high", "course::内科学"]
+    },
+    {
+      "card_id": "demo-resp-acidosis",
+      "card_type": "basic",
+      "concept_key": "动脉血气分析判断呼吸性酸中毒标准",
+      "topic": "病理生理学::酸碱平衡紊乱",
+      "frequency": 2,
+      "frequency_tier": "medium",
+      "frequency_badge": "中频 · 2次",
+      "source_kind": "past_exam",
+      "source_years": ["2021", "2024"],
+      "front": "动脉血气分析诊断失代偿期呼吸性酸中毒的核心指标变化是？",
+      "back": "pH < 7.35 且 PaCO2 > 45 mmHg。",
+      "explanation": "原发性 PaCO2 升高导致 H2CO3 浓度原发性增高；慢性呼酸可见代偿性 HCO3- 明显升高。",
+      "mnemonic": "【对比辨析】呼酸看反向：pH↓(<7.35) 而 PaCO2↑(>45 mmHg) 呈反向变化。",
+      "tags": ["freq::medium", "course::病理生理学"]
+    },
+    {
+      "card_id": "demo-anterior-mi",
+      "card_type": "mcq",
+      "concept_key": "急性前壁心肌梗死特征性心电图导联",
+      "topic": "内科学::冠心病",
+      "frequency": 1,
+      "frequency_tier": "low",
+      "frequency_badge": "真题 · 1次",
+      "source_kind": "past_exam",
+      "source_years": ["2023"],
+      "stem": "急性广泛前壁心肌梗死时，特征性 ST 段弓背向上抬高最常出现在哪些导联？",
+      "options": [
+        "A. II、III、aVF",
+        "B. V1～V5",
+        "C. I、aVL",
+        "D. V7～V9"
+      ],
+      "answer": "B",
+      "explanation": "V1～V3 对应前间壁，V3～V5 对应局限前壁，V1～V5 提示广泛前壁心梗；II、III、aVF 为下壁心梗。",
+      "tags": ["freq::low", "course::内科学"]
+    },
+    {
+      "card_id": "demo-nephrotic-cloze",
+      "card_type": "cloze",
+      "concept_key": "肾病综合征三高一低诊断标准",
+      "topic": "内科学::泌尿系统",
+      "frequency": 1,
+      "frequency_tier": "supplement",
+      "frequency_badge": "课件补充",
+      "source_kind": "ppt_supplement",
+      "source_years": ["课件第9章"],
+      "text": "肾病综合征必备的两项核心诊断标准为：{{c1::大量蛋白尿（>3.5 g/d）::尿液指标}}和{{c2::低白蛋白血症（<30 g/L）::血清蛋白}}，常伴高度水肿与高脂血症。",
+      "extra": "前两项为诊断所必需（“三高一低”中的核心两项）。",
+      "tags": ["source::ppt-supplement", "course::内科学"]
+    }
+  ]
+}
