@@ -14,7 +14,7 @@
   - Standard FSRS-5 4-button rating with live interval previews.
   - **Exam Sprint Mode** surfaces `high -> medium -> low -> supplement` cards first, paired with an exam countdown daily-pace estimator.
 - **Interactive Card Types & Eye-Care UI**:
-  - Tap-to-grade MCQs, per-blank peekable Cloze deletions, full-screen `1× / 1.75× / 2.5×` diagram lightbox, inline mnemonic editing, 90-day SVG heatmap, and Warm Paper Light / Deep Slate Dark themes.
+  - Single-choice tap-to-grade and X-type multi-select MCQs (checkbox toggle + submit-to-grade with per-option correct/missed/wrong breakdown, stem-first diagram placement), per-blank peekable Cloze deletions, full-screen `1× / 1.75× / 2.5×` diagram lightbox, inline mnemonic editing, 90-day SVG heatmap, and Warm Paper Light / Deep Slate Dark themes.
 
 ## Cloud APK Compilation (GitHub Actions)
 
