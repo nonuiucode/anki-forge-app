@@ -1,14 +1,14 @@
-# anki-forge-app
+# 玖记（anki-forge-app）
 
 [English](README.md)
 
-面向 [anki-exam-forge](https://github.com/nonuiucode/anki-exam-forge) 的**离线优先安卓原生 APK 与 Web/PWA 伴侣刷卡 App**：原生支持手机系统直接点开 `.apkg` 与 `deck.json`，提供 FSRS-5 间隔重复、真题考频冲刺、选择题交互判分、挖空逐空点击、附图全屏缩放、卡壳本（Leech）自动收纳分享回写，以及暖纸浅色 / 深蓝暗夜护眼双主题。
+**玖记**（Android 安装后桌面应用名：**玖记**）是面向 [anki-exam-forge](https://github.com/nonuiucode/anki-exam-forge) 的**离线优先安卓原生 APK 与 Web/PWA 伴侣刷卡 App**：原生支持手机系统直接点开 `.apkg` 与 `deck.json`，提供 FSRS-5 间隔重复、真题考频冲刺、选择题交互判分、挖空逐空点击、附图全屏缩放、卡壳本（Leech）自动收纳分享回写，以及暖纸浅色 / 深蓝暗夜护眼双主题。
 
 ## 核心特性
 
 - **100% 本地离线解析与打包 `.apkg`**：内置打包的 `sql.js`（SQLite WASM）+ `JSZip` + IndexedDB，无网络也能直接读写标准 `.apkg`（自动优先读取 `collection.anki21`，并还原内嵌解剖/课件图片）与 `anki-exam-forge` 生成的 `deck.json`。
 - **安卓系统级文件关联与原生分享**：
-  - 在微信、QQ 或手机文件管理里点击 `.apkg` / `deck.json` 时，可直接选择用 **Anki Forge** 打开并按 `guid` 原地合并更新（不丢失既有复习进度）。
+  - 在微信、QQ 或手机文件管理里点击 `.apkg` / `deck.json` 时，可直接选择用 **玖记** 打开并按 `guid` 原地合并更新（不丢失既有复习进度）。
   - 在「卡壳本」里一键导出 `leech-*.json` 或带复习记录的 `.apkg`，直接调起系统分享发回电脑交给 Agent 写记忆法助记。
 - **FSRS-5 + 考前考频冲刺**：
   - 日常模式采用标准 FSRS-5 算法，底部四按钮实时预测下次复习间隔。
@@ -23,8 +23,8 @@
 
 无需在本地安装 Android Studio 或 SDK。每次推送到 `main` 分支或发布 `v*` 标签时，工作流 [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) 会自动完成测试、前端构建、Capacitor 同步与 Android APK 编译：
 
-- 在仓库页面的 **Actions → Build Android APK** 下载最新构建产物 `AnkiForge-debug-apk`。
-- 打上 `v*` 标签发布时，APK 会自动附带在对应 **GitHub Releases** 页面供手机直接下载安装。
+- 在仓库页面的 **Actions → Build Android APK** 下载最新构建产物 `Jiuji-AnkiForge-debug-apk`。
+- 打上 `v*` 标签发布时，安装包 `Jiuji-AnkiForge-debug.apk` 会自动附带在对应 **GitHub Releases** 页面供手机直接下载安装。
 
 ## 本地开发与构建
 

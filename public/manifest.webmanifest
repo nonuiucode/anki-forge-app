@@ -1,6 +1,6 @@
 {
-  "name": "Anki Forge",
-  "short_name": "Anki Forge",
+  "name": "玖记 (Anki Forge)",
+  "short_name": "玖记",
   "description": "Offline-first FSRS flashcard companion for anki-exam-forge (.apkg & deck.json).",
   "start_url": "./",
   "display": "standalone",

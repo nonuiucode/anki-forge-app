@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Anki Forge</string>
-    <string name="title_activity_main">Anki Forge</string>
+    <string name="app_name">玖记</string>
+    <string name="title_activity_main">玖记</string>
     <string name="package_name">io.github.nonuiucode.ankiforge</string>
     <string name="custom_url_scheme">io.github.nonuiucode.ankiforge</string>
 </resources>

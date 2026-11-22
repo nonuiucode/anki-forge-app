@@ -332,7 +332,7 @@ export function App() {
     >
       <header className="top-bar">
         <div>
-          <h1 className="top-title">Anki Forge</h1>
+          <h1 className="top-title">玖记</h1>
           <div className="top-sub">真题考频 · FSRS 复习 · 卡壳助记闭环</div>
         </div>
         <button

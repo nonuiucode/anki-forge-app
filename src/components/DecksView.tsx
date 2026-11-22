@@ -75,7 +75,7 @@ export function DecksView({
         <div className="card-panel" style={{ textAlign: 'center', padding: '32px 16px' }}>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>还没有牌组</div>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            在手机微信或文件管理里点击收到的 .apkg 可直接用本 App 打开，也可先载入内置临床医学示例体验。
+            在手机微信或文件管理里点击收到的 .apkg 可直接用「玖记」打开，也可先载入内置临床医学示例体验。
           </div>
           <button type="button" className="btn btn-primary" onClick={onLoadDemo}>
             体验临床医学高频真题示例
