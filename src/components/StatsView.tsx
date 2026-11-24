@@ -1,6 +1,24 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { formatReminderDateTime } from '../engine/reminder';
+import {
+  FALLBACK_APP_VERSION,
+  FALLBACK_APP_VERSION_CODE,
+  GITHUB_RELEASES_PAGE,
+  extractUrlHost,
+  formatByteSize,
+  type InstalledAppVersion,
+  type UpdateCheckResult,
+  type UpdateDownloadProgress,
+} from '../engine/updater';
+import {
+  checkForAppUpdate,
+  downloadAndInstallAppUpdate,
+  getInstalledAppVersion,
+  installPendingAppUpdate,
+  isNativeAndroid,
+  openExternalDownloadUrl,
+} from '../native/androidBridge';
 import type {
   AppSettings,
   FrequencyTier,
@@ -21,6 +39,9 @@ interface StatsViewProps {
   onTestReminder: () => void;
   onExportBackup: () => void;
   onImportBackup: (file: File) => void;
+  needsBackgroundPermission?: boolean;
+  onRequestBackgroundPermission?: () => void;
+  onShowToast?: (msg: string) => void;
 }
 
 const TIER_LABELS: Record<FrequencyTier, string> = {
@@ -48,8 +69,97 @@ export function StatsView({
   onTestReminder,
   onExportBackup,
   onImportBackup,
+  needsBackgroundPermission = false,
+  onRequestBackgroundPermission,
+  onShowToast,
 }: StatsViewProps) {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
+  const [installedVersion, setInstalledVersion] = useState<InstalledAppVersion>({
+    versionName: FALLBACK_APP_VERSION,
+    versionCode: FALLBACK_APP_VERSION_CODE,
+    native: false,
+  });
+  const [updateStatus, setUpdateStatus] = useState<
+    'idle' | 'checking' | 'up_to_date' | 'available' | 'downloading' | 'needs_permission' | 'error'
+  >('idle');
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<UpdateDownloadProgress | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getInstalledAppVersion().then((info) => {
+      if (active) setInstalledVersion(info);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking');
+    try {
+      const res = await checkForAppUpdate();
+      setInstalledVersion(res.installed);
+      setUpdateResult(res);
+      if (res.hasUpdate) {
+        setUpdateStatus('available');
+        onShowToast?.(`发现新版本 v${res.manifest.version}`);
+      } else {
+        setUpdateStatus('up_to_date');
+      }
+    } catch (err) {
+      setUpdateStatus('error');
+      onShowToast?.(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDownloadAndInstall = async () => {
+    if (!updateResult) return;
+    setUpdateStatus('downloading');
+    setDownloadProgress({
+      percent: 0,
+      downloadedBytes: 0,
+      totalBytes: updateResult.manifest.apkSize ?? 0,
+      mirrorIndex: 1,
+      mirrorCount: updateResult.manifest.downloadUrls.length,
+      host: extractUrlHost(updateResult.manifest.downloadUrls[0] ?? ''),
+    });
+    try {
+      const outcome = await downloadAndInstallAppUpdate(updateResult.manifest, (p) => {
+        setDownloadProgress(p);
+      });
+      if (outcome.status === 'needs_install_permission') {
+        setUpdateStatus('needs_permission');
+        onShowToast?.('请在系统设置允许「玖记」安装应用后点继续安装');
+      } else if (outcome.status === 'opened_browser') {
+        setUpdateStatus('available');
+        onShowToast?.('已在浏览器打开下载');
+      } else {
+        setUpdateStatus('available');
+        onShowToast?.('已调起系统覆盖安装');
+      }
+    } catch (err) {
+      setUpdateStatus('error');
+      onShowToast?.(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleContinueInstall = async () => {
+    try {
+      const res = await installPendingAppUpdate();
+      if (res.status === 'needs_install_permission') {
+        onShowToast?.('请先允许「安装未知应用」权限');
+      } else if (res.status === 'missing') {
+        setUpdateStatus('available');
+        onShowToast?.('安装包缓存已失效，请重新下载');
+      } else {
+        setUpdateStatus('available');
+      }
+    } catch (err) {
+      setUpdateStatus('error');
+      onShowToast?.(err instanceof Error ? err.message : String(err));
+    }
+  };
   const now = Date.now();
   const todayStr = dateKey(now);
 
@@ -228,9 +338,7 @@ export function StatsView({
           <div className="list-row">
             <div className="list-row-text">
               <div className="list-row-title">FSRS 到期智能提醒</div>
-              <div className="list-row-sub">
-                已学卡片进入最佳复习窗口时提醒，23:00–07:30 自动顺延至次日 08:30
-              </div>
+              <div className="list-row-sub">夜间 23:00–07:30 静音顺延</div>
             </div>
             <Switch
               checked={settings.smartDueReminder}
@@ -240,19 +348,32 @@ export function StatsView({
           </div>
         </div>
         <div className="panel-foot">
-          <div className="panel-sub num-tab" style={{ marginTop: 0 }}>
-            {settings.reminderEnabled
-              ? `每日 ${String(reminderPayload.hour).padStart(2, '0')}:${String(reminderPayload.minute).padStart(2, '0')} 提醒${
-                  reminderPayload.nextDueAtMs
-                    ? ` · 下一批到期提醒：${formatReminderDateTime(reminderPayload.nextDueAtMs)}`
-                    : ''
-                }`
-              : '开启后将在每日设定时间与 FSRS 到期窗口推送本地通知'}
+          {settings.reminderEnabled ? (
+            <div className="panel-sub num-tab" style={{ marginTop: 0 }}>
+              {`每日 ${String(reminderPayload.hour).padStart(2, '0')}:${String(reminderPayload.minute).padStart(2, '0')}${
+                reminderPayload.nextDueAtMs
+                  ? ` · 下次到期 ${formatReminderDateTime(reminderPayload.nextDueAtMs)}`
+                  : ''
+              }`}
+            </div>
+          ) : (
+            <span />
+          )}
+          <div className="row-wrap">
+            {needsBackgroundPermission && onRequestBackgroundPermission && (
+              <button
+                type="button"
+                className="btn btn-sm btn-subtle"
+                onClick={onRequestBackgroundPermission}
+              >
+                后台权限
+              </button>
+            )}
+            <button type="button" className="btn btn-sm btn-subtle" onClick={onTestReminder}>
+              <Icon name="bell" size={16} />
+              测试通知
+            </button>
           </div>
-          <button type="button" className="btn btn-sm btn-subtle" onClick={onTestReminder}>
-            <Icon name="bell" size={16} />
-            测试通知
-          </button>
         </div>
       </section>
 
@@ -297,7 +418,6 @@ export function StatsView({
           <div className="list-row">
             <div className="list-row-text">
               <div className="list-row-title">卡壳自动收入阈值</div>
-              <div className="list-row-sub">遗忘次数，2–10</div>
             </div>
             <div className="stepper">
               <button
@@ -347,7 +467,6 @@ export function StatsView({
           <div className="list-row">
             <div className="list-row-text">
               <div className="list-row-title">每日新卡上限</div>
-              <div className="list-row-sub">5–200 张</div>
             </div>
             <div className="stepper">
               <button
@@ -405,7 +524,6 @@ export function StatsView({
             </span>
             <div className="list-row-text">
               <div className="list-row-title">导出全量备份 (.json)</div>
-              <div className="list-row-sub">生成备份文件，可分享或保存到本地</div>
             </div>
             <Icon name="chevronRight" size={18} className="chevron" />
           </button>
@@ -419,7 +537,6 @@ export function StatsView({
             </span>
             <div className="list-row-text">
               <div className="list-row-title">恢复全量备份</div>
-              <div className="list-row-sub">选择之前导出的 .json 备份文件</div>
             </div>
             <Icon name="chevronRight" size={18} className="chevron" />
           </button>
@@ -438,6 +555,119 @@ export function StatsView({
             }
           }}
         />
+      </section>
+
+      <section className="card-panel">
+        <div className="panel-head" style={{ marginBottom: 0 }}>
+          <div className="grow">
+            <h2 className="panel-title">应用更新</h2>
+            <div className="panel-sub num-tab" style={{ marginTop: 4 }}>
+              {updateStatus === 'idle' && `当前版本 v${installedVersion.versionName}`}
+              {updateStatus === 'checking' && `当前版本 v${installedVersion.versionName} · 检查中…`}
+              {updateStatus === 'up_to_date' && `当前版本 v${installedVersion.versionName} · 已是最新`}
+              {updateStatus === 'available' &&
+                updateResult &&
+                `发现新版本 v${updateResult.manifest.version}${
+                  updateResult.manifest.apkSize ? ` · ${formatByteSize(updateResult.manifest.apkSize)}` : ''
+                }`}
+              {updateStatus === 'downloading' &&
+                `正在下载 ${downloadProgress ? downloadProgress.percent : 0}%`}
+              {updateStatus === 'needs_permission' && '允许安装应用后点继续安装'}
+              {updateStatus === 'error' && '检查更新失败'}
+            </div>
+          </div>
+          {updateStatus !== 'available' && updateStatus !== 'needs_permission' && (
+            <button
+              type="button"
+              className="btn btn-sm btn-subtle"
+              disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+              onClick={() => void handleCheckUpdate()}
+            >
+              <Icon name="refresh" size={16} className={updateStatus === 'checking' ? 'spin' : undefined} />
+              {updateStatus === 'checking'
+                ? '检查中…'
+                : updateStatus === 'downloading'
+                  ? '下载中…'
+                  : '检查更新'}
+            </button>
+          )}
+        </div>
+
+        {updateStatus === 'downloading' && downloadProgress && (
+          <div className="update-progress-wrap">
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${downloadProgress.percent}%` }} />
+            </div>
+          </div>
+        )}
+
+        {(updateStatus === 'available' || updateStatus === 'needs_permission') &&
+          updateResult?.manifest.notesZh && (
+            <div className="update-notes">{updateResult.manifest.notesZh}</div>
+          )}
+
+        {(updateStatus === 'available' ||
+          updateStatus === 'needs_permission' ||
+          updateStatus === 'error') && (
+          <div className="update-actions">
+            {updateStatus === 'available' && updateResult && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => void handleDownloadAndInstall()}
+                >
+                  <Icon name="download" size={16} />
+                  {isNativeAndroid() ? '立即更新' : '下载新版本'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-subtle"
+                  onClick={() =>
+                    void openExternalDownloadUrl(
+                      updateResult.manifest.downloadUrls[0] ?? updateResult.manifest.releasePageUrl,
+                    )
+                  }
+                >
+                  <Icon name="externalLink" size={15} />
+                  浏览器下载
+                </button>
+              </>
+            )}
+            {updateStatus === 'needs_permission' && (
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => void handleContinueInstall()}
+              >
+                继续安装
+              </button>
+            )}
+            {updateStatus === 'error' && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-subtle"
+                  onClick={() => void handleCheckUpdate()}
+                >
+                  重试
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-subtle"
+                  onClick={() =>
+                    void openExternalDownloadUrl(
+                      updateResult?.manifest.releasePageUrl ?? GITHUB_RELEASES_PAGE,
+                    )
+                  }
+                >
+                  <Icon name="externalLink" size={15} />
+                  打开发布页
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </section>
     </>
   );

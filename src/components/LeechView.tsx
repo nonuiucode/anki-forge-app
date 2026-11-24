@@ -42,9 +42,7 @@ export function LeechView({
         <div className="panel-head">
           <div className="grow">
             <h2 className="page-title">卡壳本</h2>
-            <div className="panel-sub">
-              遗忘达到 {leechThreshold} 次的卡片会自动收进这里；导出清单即可交回 anki-exam-forge 配记忆法助记。
-            </div>
+            <div className="panel-sub">遗忘 ≥ {leechThreshold} 次自动收录</div>
           </div>
           <span className="pill pill-leech num-tab">{leechCards.length} 张</span>
         </div>
@@ -107,7 +105,6 @@ export function LeechView({
             <Icon name="check" size={24} />
           </span>
           <h2 className="empty-title">目前没有卡壳卡片</h2>
-          <p className="empty-desc">刷卡时多次点击「重来」的难背知识点会自动沉淀到这里。</p>
         </div>
       ) : (
         leechCards.map((c) => {

@@ -12,12 +12,13 @@
   - One-tap export of `leech-*.json` or scheduling-aware `.apkg` via Android `FileProvider` share sheet.
 - **Automatic FSRS-5 Scheduling & Dual Shuffling**:
   - **Auto-scheduled MCQs**: After picking a single-choice answer or submitting an X-type multi-select card, FSRS-5 interval grading is computed automatically from verdict (`correct` / `partial` / `wrong`) and response time — no repetitive 4-button rating step required after every MCQ (while Basic & Cloze cards keep the 4-button FSRS bar).
-  - **Question & Option Shuffling**: Both deck question queues (with within-tier shuffling in Exam Sprint mode) and MCQ answer choices shuffle cleanly per session (automatically skipping positional-reference options like `"All of the above"` / `"以上均正确"`), displaying original option tags (`原X`) after reveal.
+  - **Question & Option Shuffling**: Both deck question queues (with within-tier shuffling in Exam Sprint mode) and MCQ answer choices shuffle cleanly per session (automatically skipping positional-reference options like `"All of the above"` / `"以上均正确"`).
   - **Native Review Reminders**: Daily scheduled Android notifications summarizing due/leech/new cards plus quiet-hour-aware FSRS due reminders that survive device reboots.
 - **Touch Swipe Navigation, Pinch-to-Zoom Lightbox & UI Redesign**:
   - Horizontal touch swipe left/right between previous and next cards with vertical-scroll protection and per-session answer preservation (swiping back never double-logs reviews).
-  - Single-choice tap-to-grade and X-type multi-select MCQs (checkbox toggle + submit-to-grade with per-option correct/missed/wrong breakdown, stem-first diagram placement) and per-blank peekable Cloze deletions.
+  - Unified select-then-submit interaction for both single-choice and X-type multi-select MCQs (preventing accidental mis-taps, with per-option correct/missed/wrong breakdown and stem-first diagram placement), plus per-blank peekable Cloze deletions.
   - Native-feel full-screen diagram lightbox supporting two-finger pinch-to-zoom (`1×–5×`) anchored at finger midpoint, boundary-clamped panning, double-tap `1× ↔ 2.5×` zoom, vertical drag-down dismiss, and desktop wheel/drag controls.
+  - In-app update checker at the bottom of Stats querying multi-mirror CDN/proxy endpoints (works cleanly without VPN in Mainland China), verifying APK SHA-256 checksums, and launching in-place overwrite installation.
   - Understated UI redesign & polish across light/dark eye-care themes, custom switches and segmented controls, 90-day review heatmap, and frequency-tier mastery meters.
 
 ## Cloud APK Compilation (GitHub Actions)

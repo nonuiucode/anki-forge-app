@@ -70,7 +70,6 @@ export function DecksView({
             </span>
             <div className="list-row-text">
               <div className="list-row-title">题目乱序</div>
-              <div className="list-row-sub">每轮随机打乱出题顺序</div>
             </div>
             <Switch
               checked={shuffleQuestions}
@@ -84,7 +83,6 @@ export function DecksView({
             </span>
             <div className="list-row-text">
               <div className="list-row-title">选项乱序</div>
-              <div className="list-row-sub">选择题选项随机排列，揭晓后标注原卷字母</div>
             </div>
             <Switch
               checked={shuffleOptions}
@@ -101,7 +99,7 @@ export function DecksView({
         </span>
         <div className="grow">
           <div className="import-bar-title">导入卡片包</div>
-          <div className="import-bar-sub">.apkg（含图片）或 deck.json</div>
+          <div className="import-bar-sub">.apkg / deck.json</div>
         </div>
         <button
           type="button"
@@ -136,9 +134,7 @@ export function DecksView({
             decoding="async"
           />
           <h2 className="empty-title">还没有牌组</h2>
-          <p className="empty-desc">
-            在微信或文件管理里点开收到的 .apkg，可直接用「玖记」打开；也可以先载入内置的临床医学示例体验。
-          </p>
+          <p className="empty-desc">导入 .apkg / deck.json，或载入示例体验</p>
           <div className="empty-actions">
             <button type="button" className="btn btn-primary btn-block" onClick={onLoadDemo}>
               体验临床医学高频真题示例

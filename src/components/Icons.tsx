@@ -26,7 +26,9 @@ export type IconName =
   | 'info'
   | 'maximize'
   | 'minus'
-  | 'plus';
+  | 'plus'
+  | 'refresh'
+  | 'externalLink';
 
 const PATHS: Record<IconName, ReactNode> = {
   decks: (
@@ -157,6 +159,21 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   minus: <path d="M5 12h14" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  refresh: (
+    <>
+      <path d="M21 12a9 9 0 0 1-15.4 6.4L3 16" />
+      <path d="M3 20v-4h4" />
+      <path d="M3 12a9 9 0 0 1 15.4-6.4L21 8" />
+      <path d="M21 4v4h-4" />
+    </>
+  ),
+  externalLink: (
+    <>
+      <path d="M14 4h6v6" />
+      <path d="M10 14 20 4" />
+      <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+    </>
+  ),
 };
 
 export function Icon({

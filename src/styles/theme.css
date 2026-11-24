@@ -1621,19 +1621,50 @@ img {
   color: var(--bg-surface);
 }
 
-.mcq-opt-text {
-  flex: 1;
+.mcq-radio {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.mcq-orig-tag {
-  align-self: center;
-  flex-shrink: 0;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
+.mcq-radio.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.mcq-radio.selected::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-on-accent);
+}
+
+.mcq-radio.correct {
+  border-color: var(--success);
+  background: var(--success);
+  color: var(--bg-surface);
+}
+
+.mcq-radio.wrong {
+  border-color: var(--crimson);
+  background: var(--crimson);
+  color: var(--bg-surface);
+}
+
+.mcq-opt-text {
+  flex: 1;
 }
 
 .mcq-opt-tag {
@@ -2187,6 +2218,41 @@ img {
 .progress-fill.tier-supplement {
   background: var(--accent);
   opacity: 0.55;
+}
+
+.update-notes {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.update-progress-wrap {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.spin {
+  animation: icon-spin 1s linear infinite;
+}
+
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ───────── lightbox ───────── */

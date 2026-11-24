@@ -11,6 +11,7 @@ import { buildStudyQueue, scheduleCardWithPreview } from './engine/fsrs';
 import { buildReminderPayload } from './engine/reminder';
 import {
   checkReminderPermission,
+  requestReminderBackgroundPermission,
   requestReminderPermission,
   sendTestReminderNotification,
   shareOrDownloadBytes,
@@ -65,6 +66,7 @@ export function App() {
   const [sessionId, setSessionId] = useState(1);
   const [sessionQueue, setSessionQueue] = useState<StudyCard[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [needsBackgroundPermission, setNeedsBackgroundPermission] = useState(false);
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
   );
@@ -334,6 +336,24 @@ export function App() {
     [cards, decks, settings],
   );
 
+  const refreshReminderPermStatus = useCallback(async () => {
+    const perm = await checkReminderPermission();
+    setNeedsBackgroundPermission(
+      perm.native && (!perm.canExactAlarm || !perm.ignoringBatteryOptimizations),
+    );
+  }, []);
+
+  useEffect(() => {
+    void refreshReminderPermStatus();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshReminderPermStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshReminderPermStatus]);
+
   useEffect(() => {
     if (!loaded) return;
     void syncReviewReminders(reminderPayload);
@@ -348,17 +368,19 @@ export function App() {
           return;
         }
         await handleUpdateSettings({ ...settings, reminderEnabled: true });
+        await refreshReminderPermStatus();
         showToast(`已开启每日 ${settings.reminderTime} 复习提醒`);
       } else {
         await handleUpdateSettings({ ...settings, reminderEnabled: false });
         showToast('已关闭复习提醒');
       }
     },
-    [handleUpdateSettings, settings, showToast],
+    [handleUpdateSettings, refreshReminderPermStatus, settings, showToast],
   );
 
   const handleTestReminder = useCallback(async () => {
-    let { granted } = await checkReminderPermission();
+    const perm = await checkReminderPermission();
+    let granted = perm.granted;
     if (!granted) {
       granted = await requestReminderPermission();
     }
@@ -366,11 +388,24 @@ export function App() {
       showToast('未获得通知权限，请先允许通知权限');
       return;
     }
-    const ok = await sendTestReminderNotification();
-    showToast(
-      ok ? '测试通知已发送，请查看通知栏' : '当前环境不支持系统通知，请安装安卓 APK 后使用',
-    );
-  }, [showToast]);
+    await refreshReminderPermStatus();
+    const res = await sendTestReminderNotification();
+    if (!res.sent) {
+      showToast('当前环境不支持系统通知，请安装安卓 APK 后使用');
+    } else if (res.delayedSeconds && res.delayedSeconds > 0) {
+      showToast(`已排程，${res.delayedSeconds} 秒后后台触发测试通知（可切回桌面验证）`);
+    } else {
+      showToast('测试通知已发送，请查看通知栏');
+    }
+  }, [refreshReminderPermStatus, showToast]);
+
+  const handleRequestBackgroundPermission = useCallback(async () => {
+    const opened = await requestReminderBackgroundPermission();
+    if (!opened) {
+      await refreshReminderPermStatus();
+      showToast('后台定时与电池豁免权限已开启');
+    }
+  }, [refreshReminderPermStatus, showToast]);
 
   const handleExportBackup = useCallback(async () => {
     const json = await exportFullBackupJson();
@@ -521,6 +556,9 @@ export function App() {
             onTestReminder={() => void handleTestReminder()}
             onExportBackup={() => void handleExportBackup()}
             onImportBackup={(f) => void handleImportBackup(f)}
+            needsBackgroundPermission={needsBackgroundPermission}
+            onRequestBackgroundPermission={() => void handleRequestBackgroundPermission()}
+            onShowToast={showToast}
           />
         )}
       </main>

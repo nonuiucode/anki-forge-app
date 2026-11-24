@@ -2,6 +2,7 @@ package io.github.nonuiucode.ankiforge;
 
 import android.Manifest;
 import android.app.AlarmManager;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -9,7 +10,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
@@ -41,14 +45,17 @@ public class ReviewReminderPlugin extends Plugin {
     public static final String KEY_DECK_NAME = "deck_name";
     public static final String KEY_NEXT_DUE_AT_MS = "next_due_at_ms";
 
-    public static final String CHANNEL_ID = "jiuji_review_reminder";
+    public static final String CHANNEL_ID = "jiuji_review_reminder_v2";
     public static final String ACTION_DAILY_REMINDER =
         "io.github.nonuiucode.ankiforge.ACTION_DAILY_REMINDER";
     public static final String ACTION_SMART_DUE_REMINDER =
         "io.github.nonuiucode.ankiforge.ACTION_SMART_DUE_REMINDER";
+    public static final String ACTION_TEST_REMINDER =
+        "io.github.nonuiucode.ankiforge.ACTION_TEST_REMINDER";
 
     public static final int REQ_DAILY = 41001;
     public static final int REQ_SMART_DUE = 41002;
+    public static final int REQ_TEST = 41003;
     public static final int NOTIF_DAILY = 42001;
     public static final int NOTIF_SMART = 42002;
     public static final int NOTIF_TEST = 42003;
@@ -68,9 +75,11 @@ public class ReviewReminderPlugin extends Plugin {
                 NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "复习提醒",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_HIGH
                 );
                 channel.setDescription("每日定时复习与记忆曲线到期提醒");
+                channel.enableVibration(true);
+                channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
                 nm.createNotificationChannel(channel);
             }
         }
@@ -86,6 +95,16 @@ public class ReviewReminderPlugin extends Plugin {
             }
         }
         return NotificationManagerCompat.from(context).areNotificationsEnabled();
+    }
+
+    public static boolean isIgnoringBatteryOptimizations(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                return pm.isIgnoringBatteryOptimizations(context.getPackageName());
+            }
+        }
+        return true;
     }
 
     private static PendingIntent buildReceiverPendingIntent(
@@ -111,7 +130,7 @@ public class ReviewReminderPlugin extends Plugin {
         cal.set(Calendar.MINUTE, clampedM);
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
-        if (cal.getTimeInMillis() <= nowMs + 5_000L) {
+        if (cal.getTimeInMillis() <= nowMs + 1_000L) {
             cal.add(Calendar.DAY_OF_YEAR, 1);
         }
         return cal.getTimeInMillis();
@@ -141,6 +160,30 @@ public class ReviewReminderPlugin extends Plugin {
         }
     }
 
+    private static void scheduleAlarmClockSafe(
+        Context context,
+        AlarmManager am,
+        long triggerAtMs,
+        PendingIntent pi
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()) {
+            try {
+                Intent showIntent = new Intent(context, MainActivity.class);
+                showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                int showFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    showFlags |= PendingIntent.FLAG_IMMUTABLE;
+                }
+                PendingIntent showPi = PendingIntent.getActivity(context, 41099, showIntent, showFlags);
+                am.setAlarmClock(new AlarmManager.AlarmClockInfo(triggerAtMs, showPi), pi);
+                return;
+            } catch (SecurityException ignored) {
+                // Fall back to regular alarm scheduling
+            }
+        }
+        scheduleAlarmSafe(am, triggerAtMs, pi);
+    }
+
     public static long[] rescheduleFromPrefs(Context context) {
         AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (am == null) {
@@ -165,7 +208,7 @@ public class ReviewReminderPlugin extends Plugin {
         int hour = prefs.getInt(KEY_HOUR, 20);
         int minute = prefs.getInt(KEY_MINUTE, 30);
         long nextDailyAtMs = computeNextDailyTriggerMs(hour, minute, nowMs);
-        scheduleAlarmSafe(am, nextDailyAtMs, dailyPi);
+        scheduleAlarmClockSafe(context, am, nextDailyAtMs, dailyPi);
 
         long nextSmartAtMs = 0L;
         boolean smartEnabled = prefs.getBoolean(KEY_SMART_DUE_ENABLED, true);
@@ -196,7 +239,10 @@ public class ReviewReminderPlugin extends Plugin {
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(tapIntent);
 
         try {
@@ -217,6 +263,7 @@ public class ReviewReminderPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("granted", hasNotificationPermission(ctx));
         ret.put("canExactAlarm", canExact);
+        ret.put("ignoringBatteryOptimizations", isIgnoringBatteryOptimizations(ctx));
         call.resolve(ret);
     }
 
@@ -242,6 +289,42 @@ public class ReviewReminderPlugin extends Plugin {
     private void notificationPermCallback(PluginCall call) {
         JSObject ret = new JSObject();
         ret.put("granted", hasNotificationPermission(getContext()));
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestBackgroundPermission(PluginCall call) {
+        Context ctx = getContext();
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        boolean canExact =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            (am != null && am.canScheduleExactAlarms());
+        if (!canExact && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Intent exactIntent = new Intent(
+                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                Uri.parse("package:" + ctx.getPackageName())
+            );
+            exactIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(exactIntent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+            return;
+        }
+        if (!isIgnoringBatteryOptimizations(ctx) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent battIntent = new Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:" + ctx.getPackageName())
+            );
+            battIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(battIntent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+            return;
+        }
+        JSObject ret = new JSObject();
+        ret.put("opened", false);
         call.resolve(ret);
     }
 
@@ -289,6 +372,17 @@ public class ReviewReminderPlugin extends Plugin {
             call.resolve(ret);
             return;
         }
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (am != null) {
+            PendingIntent testPi = buildReceiverPendingIntent(ctx, ACTION_TEST_REMINDER, REQ_TEST);
+            am.cancel(testPi);
+            scheduleAlarmClockSafe(ctx, am, System.currentTimeMillis() + 5_000L, testPi);
+            JSObject ret = new JSObject();
+            ret.put("sent", true);
+            ret.put("delayedSeconds", 5);
+            call.resolve(ret);
+            return;
+        }
         showNotification(
             ctx,
             NOTIF_TEST,
@@ -297,6 +391,7 @@ public class ReviewReminderPlugin extends Plugin {
         );
         JSObject ret = new JSObject();
         ret.put("sent", true);
+        ret.put("delayedSeconds", 0);
         call.resolve(ret);
     }
 }

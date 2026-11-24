@@ -39,6 +39,18 @@ describe('MCQ multi-select helpers', () => {
     expect(isMultiSelectMcq('ABCD', SAMPLE_OPTIONS)).toBe(true);
   });
 
+  it('tracks pre-reveal single-choice selection cleanly before post-submit grading', () => {
+    const first = evaluateMcq(new Set(['A']), 'B', SAMPLE_OPTIONS, false);
+    expect(first.isMulti).toBe(false);
+    expect(first.getOptionState('A')).toBe('selected');
+    expect(first.getOptionState('B')).toBe('idle');
+
+    // Switching pick to B before submit marks only B selected, without grading early
+    const switched = evaluateMcq(new Set(['B']), 'B', SAMPLE_OPTIONS, false);
+    expect(switched.getOptionState('A')).toBe('idle');
+    expect(switched.getOptionState('B')).toBe('selected');
+  });
+
   it('tracks pre-reveal toggles for multi-select without grading prematurely', () => {
     const ev = evaluateMcq(new Set(['A', 'C']), 'ACD', SAMPLE_OPTIONS, false);
     expect(ev.isMulti).toBe(true);

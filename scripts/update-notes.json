@@ -1,0 +1,6 @@
+{
+  "1.3.1": {
+    "notesZh": "- 单选与多选题统一改为“先选选项，再点提交判分”，并清理界面冗余注释\n- 修复安卓后台定时推送失效问题，新增后台权限引导与 5 秒真后台测试\n- 「统计」页底部新增应用内检查更新（支持多节点直连与 SHA-256 校验覆盖升级）",
+    "notesEn": "- Unified single-choice and multi-choice MCQs to select first and tap submit, and decluttered redundant UI labels\n- Fixed background scheduled reminder notifications with exact-alarm/AlarmClock scheduling and a real 5s background alarm test\n- Added a minimal in-app update checker at the bottom of Stats with SHA-256 verified overwrite install"
+  }
+}

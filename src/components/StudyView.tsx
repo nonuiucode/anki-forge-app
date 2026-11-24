@@ -277,6 +277,21 @@ export function StudyView({
     });
   };
 
+  const selectSingleOption = (letter: string) => {
+    if (!card || revealed) return;
+    setRecords((prev) => {
+      const cur = prev[card.guid] ?? { selectedOpts: [], revealed: false };
+      const alreadyPicked = cur.selectedOpts.length === 1 && cur.selectedOpts[0] === letter;
+      return {
+        ...prev,
+        [card.guid]: {
+          ...cur,
+          selectedOpts: alreadyPicked ? [] : [letter],
+        },
+      };
+    });
+  };
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (editingMnemonic || lightboxSrc) return;
@@ -321,7 +336,7 @@ export function StudyView({
             if (mcqEval.isMulti) {
               toggleMultiOption(keyLetter);
             } else {
-              commitMcqReveal(new Set([keyLetter]));
+              selectSingleOption(keyLetter);
             }
             return;
           }
@@ -380,10 +395,6 @@ export function StudyView({
           onClick={() => setLightboxSrc(src)}
         />
       ))}
-      <div className="media-caption">
-        <Icon name="maximize" size={13} />
-        轻点全屏查看 · 支持双指缩放
-      </div>
     </div>
   ) : null;
 
@@ -547,8 +558,6 @@ export function StudyView({
                     (optState === 'correct' || optState === 'missed' || optState === 'wrong');
                   const tagLabel =
                     optState === 'correct' ? '选对' : optState === 'missed' ? '漏选' : '错选';
-                  const movedLetter =
-                    revealed && preparedMcq.shuffled && opt.originalLetter !== opt.displayLetter;
                   return (
                     <button
                       key={`${card.guid}-${opt.displayLetter}-${opt.originalLetter}`}
@@ -559,19 +568,20 @@ export function StudyView({
                         if (mcqEval.isMulti) {
                           toggleMultiOption(letter);
                         } else {
-                          commitMcqReveal(new Set([letter]));
+                          selectSingleOption(letter);
                         }
                       }}
                     >
-                      {mcqEval.isMulti && (
+                      {mcqEval.isMulti ? (
                         <span className={`mcq-check ${optState}`} aria-hidden="true">
                           {checkChar}
                         </span>
+                      ) : (
+                        <span className={`mcq-radio ${optState}`} aria-hidden="true">
+                          {optState === 'correct' ? '✓' : optState === 'wrong' ? '✕' : ''}
+                        </span>
                       )}
                       <span className="mcq-opt-text">{opt.displayText}</span>
-                      {movedLetter && (
-                        <span className="mcq-orig-tag">原{opt.originalLetter}</span>
-                      )}
                       {showTag && <span className={`mcq-opt-tag ${optState}`}>{tagLabel}</span>}
                     </button>
                   );
@@ -615,7 +625,7 @@ export function StudyView({
 
           {!revealed ? (
             <div className="reveal-zone">
-              {card.cardType === 'mcq' && mcqEval?.isMulti ? (
+              {card.cardType === 'mcq' && mcqEval ? (
                 mcqEval.selectedLetters.length > 0 ? (
                   <div className="reveal-actions">
                     <button
@@ -641,10 +651,10 @@ export function StudyView({
                 ) : (
                   <button
                     type="button"
-                    className="btn btn-primary btn-lg btn-block"
+                    className="btn btn-subtle btn-lg btn-block"
                     onClick={() => commitMcqReveal(new Set())}
                   >
-                    直接显示答案（未勾选）
+                    直接显示答案（未选择）
                   </button>
                 )
               ) : (
@@ -652,17 +662,13 @@ export function StudyView({
                   type="button"
                   className="btn btn-primary btn-lg btn-block"
                   onClick={() => {
-                    if (card.cardType === 'mcq') {
-                      commitMcqReveal(selectedSet);
-                    } else {
-                      setRecords((prev) => ({
-                        ...prev,
-                        [card.guid]: {
-                          ...(prev[card.guid] ?? { selectedOpts: [], revealed: false }),
-                          revealed: true,
-                        },
-                      }));
-                    }
+                    setRecords((prev) => ({
+                      ...prev,
+                      [card.guid]: {
+                        ...(prev[card.guid] ?? { selectedOpts: [], revealed: false }),
+                        revealed: true,
+                      },
+                    }));
                   }}
                 >
                   显示答案
@@ -674,34 +680,30 @@ export function StudyView({
               <hr className="study-divider" />
               {card.cardType === 'basic' && <div className="study-answer-box">{card.back}</div>}
               {card.cardType === 'mcq' && preparedMcq && mcqEval && (() => {
-                const ansSuffix =
-                  preparedMcq.shuffled && preparedMcq.answer !== preparedMcq.originalAnswer
-                    ? `（原卷 ${preparedMcq.originalAnswer}）`
-                    : '';
                 if (mcqEval.verdict === 'correct') {
                   return (
                     <div className="study-answer-box">
-                      回答正确 · 参考答案：{preparedMcq.answer}{ansSuffix}
+                      回答正确 · 参考答案：{preparedMcq.answer}
                     </div>
                   );
                 }
                 if (mcqEval.verdict === 'partial') {
                   return (
                     <div className="study-answer-box partial">
-                      漏选（已选 {mcqEval.selectedLetters.join('')} / 漏选 {mcqEval.missedLetters.join('')}）· 参考答案：{preparedMcq.answer}{ansSuffix}
+                      漏选（已选 {mcqEval.selectedLetters.join('')} / 漏选 {mcqEval.missedLetters.join('')}）· 参考答案：{preparedMcq.answer}
                     </div>
                   );
                 }
                 if (mcqEval.verdict === 'wrong') {
                   return (
                     <div className="study-answer-box wrong">
-                      回答有误（已选 {mcqEval.selectedLetters.join('')}）· 参考答案：{preparedMcq.answer}{ansSuffix}
+                      回答有误（已选 {mcqEval.selectedLetters.join('')}）· 参考答案：{preparedMcq.answer}
                     </div>
                   );
                 }
                 return (
                   <div className="study-answer-box">
-                    参考答案：{preparedMcq.answer}{ansSuffix}
+                    参考答案：{preparedMcq.answer}
                   </div>
                 );
               })()}
@@ -714,7 +716,7 @@ export function StudyView({
                   <AppMark size={22} />
                   <div className="archive-text">
                     <strong>下次复习 · {currentRecord.archived.intervalLabel}</strong>
-                    <span>已按记忆曲线自动归档 · {currentRecord.archived.reason}</span>
+                    <span>{currentRecord.archived.reason}</span>
                   </div>
                 </div>
               )}
@@ -765,9 +767,7 @@ export function StudyView({
                 ) : card.mnemonic ? (
                   <div>{card.mnemonic}</div>
                 ) : (
-                  <div className="box-empty">
-                    暂无助记；如果反复记不住，可导出卡壳清单交给 AI 生成记忆法后回写。
-                  </div>
+                  <div className="box-empty">暂无助记</div>
                 )}
               </div>
 
@@ -810,7 +810,6 @@ export function StudyView({
           <Icon name="chevronLeft" size={18} />
           上一题
         </button>
-        <span className="study-nav-tip">左右滑动切题</span>
         <button
           type="button"
           className="btn btn-sm btn-ghost"

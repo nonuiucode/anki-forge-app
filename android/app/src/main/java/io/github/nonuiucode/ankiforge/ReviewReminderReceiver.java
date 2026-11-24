@@ -1,9 +1,12 @@
 package io.github.nonuiucode.ankiforge;
 
+import android.app.AlarmManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
+import android.os.PowerManager;
 
 public class ReviewReminderReceiver extends BroadcastReceiver {
 
@@ -17,61 +20,87 @@ public class ReviewReminderReceiver extends BroadcastReceiver {
             return;
         }
 
-        SharedPreferences prefs = ReviewReminderPlugin.getPrefs(context);
-        boolean enabled = prefs.getBoolean(ReviewReminderPlugin.KEY_ENABLED, false);
+        PowerManager.WakeLock wakeLock = null;
+        try {
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jiuji:reminder_wake");
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(5_000L);
+            }
 
-        if (ReviewReminderPlugin.ACTION_DAILY_REMINDER.equals(action)) {
-            if (enabled) {
-                int dueCount = prefs.getInt(ReviewReminderPlugin.KEY_DUE_COUNT, 0);
-                int newCount = prefs.getInt(ReviewReminderPlugin.KEY_NEW_COUNT, 0);
-                int leechCount = prefs.getInt(ReviewReminderPlugin.KEY_LEECHE_COUNT, 0);
+            if (ReviewReminderPlugin.ACTION_TEST_REMINDER.equals(action)) {
+                ReviewReminderPlugin.showNotification(
+                    context,
+                    ReviewReminderPlugin.NOTIF_TEST,
+                    "玖记 · 后台提醒正常",
+                    "定时推送链路正常，到点会在后台提醒你复习"
+                );
+                return;
+            }
 
-                String title = "玖记 · 每日复习提醒";
-                String body;
-                if (dueCount > 0) {
-                    body = leechCount > 0
-                        ? "今日有 " + dueCount + " 张卡片待复习（含 " + leechCount + " 张卡壳题），点此开始"
-                        : "今日有 " + dueCount + " 张卡片待复习，点此开始翻牌";
-                } else if (newCount > 0) {
-                    body = "今日还可学习 " + newCount + " 张新卡片，点此开始翻牌";
-                } else {
-                    body = "今日待复习已清空，进来巩固几张保持手感";
+            SharedPreferences prefs = ReviewReminderPlugin.getPrefs(context);
+            boolean enabled = prefs.getBoolean(ReviewReminderPlugin.KEY_ENABLED, false);
+
+            if (ReviewReminderPlugin.ACTION_DAILY_REMINDER.equals(action)) {
+                if (enabled) {
+                    int dueCount = prefs.getInt(ReviewReminderPlugin.KEY_DUE_COUNT, 0);
+                    int newCount = prefs.getInt(ReviewReminderPlugin.KEY_NEW_COUNT, 0);
+                    int leechCount = prefs.getInt(ReviewReminderPlugin.KEY_LEECHE_COUNT, 0);
+
+                    String title = "玖记 · 每日复习提醒";
+                    String body;
+                    if (dueCount > 0) {
+                        body = leechCount > 0
+                            ? "今日有 " + dueCount + " 张卡片待复习（含 " + leechCount + " 张卡壳题），点此开始"
+                            : "今日有 " + dueCount + " 张卡片待复习，点此开始翻牌";
+                    } else if (newCount > 0) {
+                        body = "今日还可学习 " + newCount + " 张新卡片，点此开始翻牌";
+                    } else {
+                        body = "今日待复习已清空，进来巩固几张保持手感";
+                    }
+                    ReviewReminderPlugin.showNotification(
+                        context,
+                        ReviewReminderPlugin.NOTIF_DAILY,
+                        title,
+                        body
+                    );
                 }
-                ReviewReminderPlugin.showNotification(
-                    context,
-                    ReviewReminderPlugin.NOTIF_DAILY,
-                    title,
-                    body
-                );
+                ReviewReminderPlugin.rescheduleFromPrefs(context);
+                return;
             }
-            ReviewReminderPlugin.rescheduleFromPrefs(context);
-            return;
-        }
 
-        if (ReviewReminderPlugin.ACTION_SMART_DUE_REMINDER.equals(action)) {
-            boolean smartEnabled = prefs.getBoolean(ReviewReminderPlugin.KEY_SMART_DUE_ENABLED, true);
-            if (enabled && smartEnabled) {
-                String deckName = prefs.getString(ReviewReminderPlugin.KEY_DECK_NAME, "玖记");
-                String title = "玖记 · 记忆曲线到期提醒";
-                String body = "「" + deckName + "」有卡片进入最佳复习窗口，点此开始复习";
-                ReviewReminderPlugin.showNotification(
-                    context,
-                    ReviewReminderPlugin.NOTIF_SMART,
-                    title,
-                    body
-                );
+            if (ReviewReminderPlugin.ACTION_SMART_DUE_REMINDER.equals(action)) {
+                boolean smartEnabled = prefs.getBoolean(ReviewReminderPlugin.KEY_SMART_DUE_ENABLED, true);
+                if (enabled && smartEnabled) {
+                    String deckName = prefs.getString(ReviewReminderPlugin.KEY_DECK_NAME, "玖记");
+                    String title = "玖记 · 记忆曲线到期提醒";
+                    String body = "「" + deckName + "」有卡片进入最佳复习窗口，点此开始复习";
+                    ReviewReminderPlugin.showNotification(
+                        context,
+                        ReviewReminderPlugin.NOTIF_SMART,
+                        title,
+                        body
+                    );
+                }
+                prefs.edit().putLong(ReviewReminderPlugin.KEY_NEXT_DUE_AT_MS, 0L).apply();
+                return;
             }
-            prefs.edit().putLong(ReviewReminderPlugin.KEY_NEXT_DUE_AT_MS, 0L).apply();
-            return;
-        }
 
-        if (
-            Intent.ACTION_BOOT_COMPLETED.equals(action) ||
-            Intent.ACTION_TIME_CHANGED.equals(action) ||
-            Intent.ACTION_TIMEZONE_CHANGED.equals(action) ||
-            Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
-        ) {
-            ReviewReminderPlugin.rescheduleFromPrefs(context);
+            if (
+                Intent.ACTION_BOOT_COMPLETED.equals(action) ||
+                Intent.ACTION_TIME_CHANGED.equals(action) ||
+                Intent.ACTION_TIMEZONE_CHANGED.equals(action) ||
+                Intent.ACTION_MY_PACKAGE_REPLACED.equals(action) ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED.equals(action))
+            ) {
+                ReviewReminderPlugin.rescheduleFromPrefs(context);
+            }
+        } finally {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
         }
     }
 }
