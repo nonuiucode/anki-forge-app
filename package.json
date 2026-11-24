@@ -1,6 +1,6 @@
 {
   "name": "anki-forge-app",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Offline-first Android & Web Anki companion app for anki-exam-forge: .apkg & deck.json reader, FSRS-5 spaced repetition, exam-frequency sprint, interactive MCQ/Cloze, leech export, and minimalist eye-care UI.",
   "type": "module",
   "private": false,

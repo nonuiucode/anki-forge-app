@@ -1,12 +1,22 @@
 import { useRef } from 'react';
 
-import type { AppSettings, FrequencyTier, ReviewLogEntry, StudyCard } from '../types';
+import { formatReminderDateTime } from '../engine/reminder';
+import type {
+  AppSettings,
+  FrequencyTier,
+  ReviewLogEntry,
+  ReviewReminderPayload,
+  StudyCard,
+} from '../types';
 
 interface StatsViewProps {
   cards: StudyCard[];
   logs: ReviewLogEntry[];
   settings: AppSettings;
+  reminderPayload: ReviewReminderPayload;
   onUpdateSettings: (next: AppSettings) => void;
+  onToggleReminder: (enabled: boolean) => void;
+  onTestReminder: () => void;
   onExportBackup: () => void;
   onImportBackup: (file: File) => void;
 }
@@ -30,7 +40,10 @@ export function StatsView({
   cards,
   logs,
   settings,
+  reminderPayload,
   onUpdateSettings,
+  onToggleReminder,
+  onTestReminder,
   onExportBackup,
   onImportBackup,
 }: StatsViewProps) {
@@ -146,6 +159,77 @@ export function StatsView({
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="card-panel">
+        <div className="row-between" style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>复习提醒</div>
+          <span className={`pill ${settings.reminderEnabled ? 'pill-topic' : ''}`}>
+            {settings.reminderEnabled ? '已开启' : '未开启'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="row-between">
+            <span style={{ fontSize: 14 }}>开启每日复习提醒</span>
+            <input
+              type="checkbox"
+              aria-label="开启每日复习提醒"
+              style={{ width: 20, height: 20, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              checked={settings.reminderEnabled}
+              onChange={(e) => onToggleReminder(e.target.checked)}
+            />
+          </div>
+
+          <div className="row-between">
+            <span style={{ fontSize: 14 }}>每日提醒时间</span>
+            <input
+              type="time"
+              aria-label="每日提醒时间"
+              className="input-field num-tab"
+              style={{ width: 'auto', minWidth: 112 }}
+              value={settings.reminderTime}
+              onChange={(e) =>
+                onUpdateSettings({
+                  ...settings,
+                  reminderTime: e.target.value || '20:30',
+                })
+              }
+            />
+          </div>
+
+          <div className="row-between">
+            <div>
+              <div style={{ fontSize: 14 }}>FSRS 到期智能提醒</div>
+              <div className="top-sub">
+                已学卡片进入最佳复习窗口时提醒，23:00–07:30 自动顺延至次日 08:30
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              aria-label="FSRS 到期智能提醒"
+              style={{ width: 20, height: 20, accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}
+              checked={settings.smartDueReminder}
+              onChange={(e) =>
+                onUpdateSettings({ ...settings, smartDueReminder: e.target.checked })
+              }
+            />
+          </div>
+
+          <div className="row-between" style={{ paddingTop: 2 }}>
+            <div className="top-sub num-tab">
+              {settings.reminderEnabled
+                ? `每日 ${String(reminderPayload.hour).padStart(2, '0')}:${String(reminderPayload.minute).padStart(2, '0')} 提醒${
+                    reminderPayload.nextDueAtMs
+                      ? ` · 下一批到期提醒：${formatReminderDateTime(reminderPayload.nextDueAtMs)}`
+                      : ''
+                  }`
+                : '开启后将在每日设定时间与 FSRS 到期窗口推送本地通知'}
+            </div>
+            <button type="button" className="btn btn-sm btn-subtle" onClick={onTestReminder}>
+              发送测试通知
+            </button>
+          </div>
         </div>
       </div>
 

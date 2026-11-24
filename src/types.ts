@@ -74,6 +74,21 @@ export interface AppSettings {
   showIntervals: boolean;
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
+  reminderEnabled: boolean;
+  reminderTime: string;
+  smartDueReminder: boolean;
+}
+
+export interface ReviewReminderPayload {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+  smartDueEnabled: boolean;
+  dueCount: number;
+  newCount: number;
+  leechCount: number;
+  deckName: string;
+  nextDueAtMs: number | null;
 }
 
 export interface ImportResult {

@@ -7,7 +7,16 @@ import { StatsView } from './components/StatsView';
 import { StudyView } from './components/StudyView';
 import { exportApkg, exportLeechJson, importApkg, importDeckJson } from './engine/apkgCodec';
 import { buildStudyQueue, scheduleCardWithPreview } from './engine/fsrs';
-import { shareOrDownloadBytes, shareOrDownloadText, subscribeIncomingFiles } from './native/androidBridge';
+import { buildReminderPayload } from './engine/reminder';
+import {
+  checkReminderPermission,
+  requestReminderPermission,
+  sendTestReminderNotification,
+  shareOrDownloadBytes,
+  shareOrDownloadText,
+  subscribeIncomingFiles,
+  syncReviewReminders,
+} from './native/androidBridge';
 import {
   DEFAULT_SETTINGS,
   deleteDeckAndCards,
@@ -54,6 +63,7 @@ export function App() {
   const [tierFilter, setTierFilter] = useState<FrequencyTier | 'all'>('all');
   const [sessionId, setSessionId] = useState(1);
   const [sessionQueue, setSessionQueue] = useState<StudyCard[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -85,6 +95,7 @@ export function App() {
       }
       return next;
     });
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -315,6 +326,49 @@ export function App() {
     await saveSettings(next);
   }, []);
 
+  const reminderPayload = useMemo(
+    () => buildReminderPayload(cards, decks, settings),
+    [cards, decks, settings],
+  );
+
+  useEffect(() => {
+    if (!loaded) return;
+    void syncReviewReminders(reminderPayload);
+  }, [loaded, reminderPayload]);
+
+  const handleToggleReminder = useCallback(
+    async (enabled: boolean) => {
+      if (enabled) {
+        const granted = await requestReminderPermission();
+        if (!granted) {
+          showToast('未获得通知权限，请在系统设置中允许「玖记」发送通知');
+          return;
+        }
+        await handleUpdateSettings({ ...settings, reminderEnabled: true });
+        showToast(`已开启每日 ${settings.reminderTime} 复习提醒`);
+      } else {
+        await handleUpdateSettings({ ...settings, reminderEnabled: false });
+        showToast('已关闭复习提醒');
+      }
+    },
+    [handleUpdateSettings, settings, showToast],
+  );
+
+  const handleTestReminder = useCallback(async () => {
+    let { granted } = await checkReminderPermission();
+    if (!granted) {
+      granted = await requestReminderPermission();
+    }
+    if (!granted) {
+      showToast('未获得通知权限，请先允许通知权限');
+      return;
+    }
+    const ok = await sendTestReminderNotification();
+    showToast(
+      ok ? '测试通知已发送，请查看通知栏' : '当前环境不支持系统通知，请安装安卓 APK 后使用',
+    );
+  }, [showToast]);
+
   const handleExportBackup = useCallback(async () => {
     const json = await exportFullBackupJson();
     const fname = `anki-forge-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -367,18 +421,27 @@ export function App() {
             <div className="top-sub">真题考频 · FSRS 自动归档 · 乱序记忆</div>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-sm btn-subtle"
-          onClick={() =>
-            void handleUpdateSettings({
-              ...settings,
-              theme: isDark ? 'light' : 'dark',
-            })
-          }
-        >
-          {isDark ? '晴海' : '深海'}
-        </button>
+        <div className="row-wrap">
+          <button
+            type="button"
+            className={`btn btn-sm ${settings.reminderEnabled ? 'btn-primary' : 'btn-subtle'}`}
+            onClick={() => setTab('stats')}
+          >
+            {settings.reminderEnabled ? `提醒 ${settings.reminderTime}` : '提醒'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-subtle"
+            onClick={() =>
+              void handleUpdateSettings({
+                ...settings,
+                theme: isDark ? 'light' : 'dark',
+              })
+            }
+          >
+            {isDark ? '晴海' : '深海'}
+          </button>
+        </div>
       </header>
 
       {toast && <div className="toast-banner">{toast}</div>}
@@ -447,7 +510,10 @@ export function App() {
             cards={cards}
             logs={logs}
             settings={settings}
+            reminderPayload={reminderPayload}
             onUpdateSettings={(s) => void handleUpdateSettings(s)}
+            onToggleReminder={(en) => void handleToggleReminder(en)}
+            onTestReminder={() => void handleTestReminder()}
             onExportBackup={() => void handleExportBackup()}
             onImportBackup={(f) => void handleImportBackup(f)}
           />

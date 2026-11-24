@@ -1,6 +1,6 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
-import type { PendingNativeFile } from '../types';
+import type { PendingNativeFile, ReviewReminderPayload } from '../types';
 
 interface ApkgIntentNativePlugin {
   getPendingFile(): Promise<{ hasFile: boolean; filename?: string; dataBase64?: string }>;
@@ -11,7 +11,25 @@ interface ApkgIntentNativePlugin {
   ): Promise<PluginListenerHandle>;
 }
 
+interface ReviewReminderNativePlugin {
+  checkPermission(): Promise<{ granted: boolean; canExactAlarm?: boolean }>;
+  requestNotificationPermission(): Promise<{ granted: boolean }>;
+  syncReminders(options: {
+    enabled: boolean;
+    hour: number;
+    minute: number;
+    smartDueEnabled: boolean;
+    dueCount: number;
+    newCount: number;
+    leechCount: number;
+    deckName: string;
+    nextDueAtMs: number;
+  }): Promise<{ scheduled: boolean; nextDailyAtMs?: number; nextSmartDueAtMs?: number }>;
+  sendTestNotification(): Promise<{ sent: boolean }>;
+}
+
 const ApkgIntent = registerPlugin<ApkgIntentNativePlugin>('ApkgIntent');
+const ReviewReminder = registerPlugin<ReviewReminderNativePlugin>('ReviewReminder');
 
 export function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -107,4 +125,86 @@ export async function shareOrDownloadText(
 ): Promise<'shared' | 'downloaded'> {
   const bytes = new TextEncoder().encode(text);
   return shareOrDownloadBytes(filename, mimeType, bytes);
+}
+
+export async function checkReminderPermission(): Promise<{ granted: boolean; native: boolean }> {
+  if (isNativeAndroid()) {
+    try {
+      const res = await ReviewReminder.checkPermission();
+      return { granted: Boolean(res?.granted), native: true };
+    } catch {
+      return { granted: false, native: true };
+    }
+  }
+  if (typeof Notification !== 'undefined') {
+    return { granted: Notification.permission === 'granted', native: false };
+  }
+  return { granted: false, native: false };
+}
+
+export async function requestReminderPermission(): Promise<boolean> {
+  if (isNativeAndroid()) {
+    try {
+      const res = await ReviewReminder.requestNotificationPermission();
+      return Boolean(res?.granted);
+    } catch {
+      return false;
+    }
+  }
+  if (typeof Notification !== 'undefined') {
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
+    try {
+      const res = await Notification.requestPermission();
+      return res === 'granted';
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+export async function syncReviewReminders(
+  payload: ReviewReminderPayload,
+): Promise<{ scheduled: boolean; nextDailyAtMs?: number; nextSmartDueAtMs?: number }> {
+  if (!isNativeAndroid()) {
+    return { scheduled: false };
+  }
+  try {
+    return await ReviewReminder.syncReminders({
+      enabled: payload.enabled,
+      hour: payload.hour,
+      minute: payload.minute,
+      smartDueEnabled: payload.smartDueEnabled,
+      dueCount: payload.dueCount,
+      newCount: payload.newCount,
+      leechCount: payload.leechCount,
+      deckName: payload.deckName,
+      nextDueAtMs: payload.nextDueAtMs ?? 0,
+    });
+  } catch {
+    return { scheduled: false };
+  }
+}
+
+export async function sendTestReminderNotification(): Promise<boolean> {
+  if (isNativeAndroid()) {
+    try {
+      const res = await ReviewReminder.sendTestNotification();
+      return Boolean(res?.sent);
+    } catch {
+      return false;
+    }
+  }
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      new Notification('玖记 · 复习提醒已就绪', {
+        body: '浏览器通知可用；桌面提醒需保持页面打开，手机 APK 支持后台定时与记忆曲线到期提醒。',
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }

@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkgIntentPlugin.class);
+        registerPlugin(ReviewReminderPlugin.class);
         super.onCreate(savedInstanceState);
         ApkgIntentPlugin.handleIncomingIntent(this, getIntent());
     }

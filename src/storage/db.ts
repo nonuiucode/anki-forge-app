@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showIntervals: true,
   shuffleQuestions: true,
   shuffleOptions: true,
+  reminderEnabled: false,
+  reminderTime: '20:30',
+  smartDueReminder: true,
 };
 
 function openDb(): Promise<IDBDatabase> {
