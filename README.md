@@ -20,7 +20,10 @@
 
 ## Cloud APK Compilation (GitHub Actions)
 
-No local Android Studio or SDK is required. On every push to `main`, PR, or `v*` tag, [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs Vitest, builds Vite, syncs Capacitor Android, compiles the APK with Temurin JDK 21 + Android API 35, and uploads `Jiuji-AnkiForge-debug-apk` (plus attaches `Jiuji-AnkiForge-debug.apk` to GitHub Releases on `v*` tags).
+No local Android Studio or SDK is required. On every push to `main`, PR, or `v*` tag, [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs Vitest, builds Vite, syncs Capacitor Android, and compiles the APK with Temurin JDK 21 + Android API 35:
+
+- When the four `ANDROID_KEYSTORE_*` repository secrets are configured (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), the workflow verifies the keystore, compiles a permanently signed **Release APK** (`Jiuji-AnkiForge-release.apk` / artifact `Jiuji-AnkiForge-release-apk`), verifies its signature with `apksigner`, and attaches it to `v*` GitHub Releases so subsequent updates overwrite-install seamlessly without losing local progress.
+- On forks or PRs without signing secrets, it automatically falls back to building `Jiuji-AnkiForge-debug.apk`.
 
 ## Local Development
 

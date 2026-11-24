@@ -24,10 +24,10 @@
 
 ## 云端自动构建 APK（GitHub Actions）
 
-无需在本地安装 Android Studio 或 SDK。每次推送到 `main` 分支或发布 `v*` 标签时，工作流 [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) 会自动完成测试、前端构建、Capacitor 同步与 Android APK 编译：
+无需在本地安装 Android Studio 或 SDK。每次推送到 `main` 分支、PR 或发布 `v*` 标签时，工作流 [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) 会自动完成测试、前端构建、Capacitor 同步与 Android APK 编译：
 
-- 在仓库页面的 **Actions → Build Android APK** 下载最新构建产物 `Jiuji-AnkiForge-debug-apk`。
-- 打上 `v*` 标签发布时，安装包 `Jiuji-AnkiForge-debug.apk` 会自动附带在对应 **GitHub Releases** 页面供手机直接下载安装。
+- 当仓库配置了固定正式签名密钥 Secrets（`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`）时，云端会编译并校验**固定正式签名 Release APK**（产物名 `Jiuji-AnkiForge-release-apk`，Release 附件 `Jiuji-AnkiForge-release.apk`），后续所有版本更新都能直接覆盖安装、保留做题进度。
+- 在没有签名 Secrets 的 Fork 或 PR 上，工作流会自动回退为构建 `Jiuji-AnkiForge-debug.apk`。
 
 ## 本地开发与构建
 

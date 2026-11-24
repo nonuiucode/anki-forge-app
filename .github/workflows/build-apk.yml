@@ -64,22 +64,75 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Build debug APK
+      - name: Prepare Android signing config
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            KEYSTORE_PATH="$RUNNER_TEMP/jiuji-release.p12"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$KEYSTORE_PATH"
+            keytool -list -keystore "$KEYSTORE_PATH" -storetype PKCS12 -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
+            {
+              echo "mode=release"
+              echo "keystore_path=$KEYSTORE_PATH"
+              echo "apk_file=Jiuji-AnkiForge-release.apk"
+              echo "artifact_name=Jiuji-AnkiForge-release-apk"
+            } >> "$GITHUB_OUTPUT"
+            echo "Release signing configured for alias: $ANDROID_KEY_ALIAS"
+          else
+            if [[ "$GITHUB_REF" == refs/tags/v* ]] && [ "$GITHUB_REPOSITORY" = "nonuiucode/anki-forge-app" ]; then
+              echo "::error::Release tag $GITHUB_REF requires ANDROID_KEYSTORE_* secrets to build a signed APK."
+              exit 1
+            fi
+            {
+              echo "mode=debug"
+              echo "keystore_path="
+              echo "apk_file=Jiuji-AnkiForge-debug.apk"
+              echo "artifact_name=Jiuji-AnkiForge-debug-apk"
+            } >> "$GITHUB_OUTPUT"
+            echo "Signing secrets unavailable; falling back to debug APK."
+          fi
+
+      - name: Build signed Release APK
+        if: steps.signing.outputs.mode == 'release'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../Jiuji-AnkiForge-release.apk
+          APKSIGNER="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0/apksigner"
+          "$APKSIGNER" verify --verbose --print-certs ../Jiuji-AnkiForge-release.apk
+
+      - name: Build debug APK (fallback when signing secrets absent)
+        if: steps.signing.outputs.mode != 'release'
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk ../Jiuji-AnkiForge-debug.apk
 
+      - name: Clean up temporary signing keystore
+        if: always() && steps.signing.outputs.keystore_path != ''
+        run: rm -f "${{ steps.signing.outputs.keystore_path }}"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Jiuji-AnkiForge-debug-apk
-          path: Jiuji-AnkiForge-debug.apk
+          name: ${{ steps.signing.outputs.artifact_name }}
+          path: ${{ steps.signing.outputs.apk_file }}
           if-no-files-found: error
 
       - name: Attach APK to GitHub Release on tag push
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: Jiuji-AnkiForge-debug.apk
+          files: ${{ steps.signing.outputs.apk_file }}
