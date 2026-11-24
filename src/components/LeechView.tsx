@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import type { DeckRecord, StudyCard } from '../types';
+import { Icon } from './Icons';
 
 interface LeechViewProps {
   decks: DeckRecord[];
@@ -37,21 +38,21 @@ export function LeechView({
 
   return (
     <>
-      <div className="card-panel">
-        <div className="row-between" style={{ marginBottom: 10 }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>卡壳本 (Leech)</div>
-            <div className="top-sub">
-              遗忘达到 {leechThreshold} 次的卡片自动收入这里，一键导出即可交回 anki-exam-forge 配记忆法助记
+      <section className="card-panel">
+        <div className="panel-head">
+          <div className="grow">
+            <h2 className="page-title">卡壳本</h2>
+            <div className="panel-sub">
+              遗忘达到 {leechThreshold} 次的卡片会自动收进这里；导出清单即可交回 anki-exam-forge 配记忆法助记。
             </div>
           </div>
           <span className="pill pill-leech num-tab">{leechCards.length} 张</span>
         </div>
 
-        <div className="row-wrap">
+        <div className="toolbar">
           <select
             className="select-field"
-            style={{ flex: 1, minWidth: 160 }}
+            aria-label="选择牌组"
             value={selectedDeckId}
             onChange={(e) => setSelectedDeckId(e.target.value)}
           >
@@ -62,56 +63,65 @@ export function LeechView({
               </option>
             ))}
           </select>
-          {selectedDeck && (
+          <div className="toolbar-actions">
+            {selectedDeck && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={leechCards.length === 0}
+                onClick={() =>
+                  onStartLeechStudy(selectedDeckId === 'all' ? selectedDeck.id : selectedDeckId)
+                }
+              >
+                <Icon name="target" size={16} />
+                攻坚刷卡
+              </button>
+            )}
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-subtle btn-sm"
+              aria-label="导出卡壳清单 (.json)"
               disabled={leechCards.length === 0}
-              onClick={() => onStartLeechStudy(selectedDeckId === 'all' ? selectedDeck.id : selectedDeckId)}
+              onClick={() => onExportLeechJson(exportDeckName, leechCards)}
             >
-              攻坚刷卡
+              <Icon name="download" size={16} />
+              导出清单
             </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={leechCards.length === 0}
-            onClick={() => onExportLeechJson(exportDeckName, leechCards)}
-          >
-            导出卡壳清单 (.json)
-          </button>
-          {selectedDeck && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => onExportApkg(selectedDeck)}
-            >
-              导出含进度 .apkg
-            </button>
-          )}
+            {selectedDeck && (
+              <button
+                type="button"
+                className="btn btn-subtle btn-sm"
+                aria-label="导出含进度 .apkg"
+                onClick={() => onExportApkg(selectedDeck)}
+              >
+                导出 .apkg
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </section>
 
       {leechCards.length === 0 ? (
-        <div className="card-panel" style={{ textAlign: 'center', padding: '28px 16px' }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>目前没有卡壳卡片</div>
-          <div className="top-sub" style={{ marginTop: 4 }}>
-            刷卡时多次点击「重来」的难背知识点会自动沉淀到这里。
-          </div>
+        <div className="card-panel empty-state">
+          <span className="empty-badge">
+            <Icon name="check" size={24} />
+          </span>
+          <h2 className="empty-title">目前没有卡壳卡片</h2>
+          <p className="empty-desc">刷卡时多次点击「重来」的难背知识点会自动沉淀到这里。</p>
         </div>
       ) : (
         leechCards.map((c) => {
           const isEditing = editingGuid === c.guid;
           return (
-            <div key={c.guid} className="card-panel">
-              <div className="row-between" style={{ marginBottom: 6 }}>
-                <div className="row-wrap">
+            <article key={c.guid} className="card-panel">
+              <div className="leech-head">
+                <div className="study-meta">
                   <span className="pill pill-leech num-tab">遗忘 {c.fsrs.lapses} 次</span>
                   {c.topic && <span className="pill pill-topic">{c.topic}</span>}
                 </div>
                 <button
                   type="button"
-                  className="btn btn-sm btn-subtle"
+                  className="text-btn"
                   onClick={() => {
                     if (isEditing) {
                       setEditingGuid(null);
@@ -124,17 +134,13 @@ export function LeechView({
                   {isEditing ? '取消' : c.mnemonic ? '改助记' : '写助记'}
                 </button>
               </div>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.front || c.stem || c.text}</div>
-              <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-                {c.back || c.answer || c.extra}
-              </div>
+              <div className="leech-q">{c.front || c.stem || c.text}</div>
+              <div className="leech-a">{c.back || c.answer || c.extra}</div>
               {c.mnemonic && !isEditing && (
-                <div className="study-mnemonic-box" style={{ marginTop: 8, padding: '8px 12px' }}>
-                  {c.mnemonic}
-                </div>
+                <div className="study-mnemonic-box is-compact">{c.mnemonic}</div>
               )}
               {isEditing && (
-                <div style={{ marginTop: 8 }}>
+                <div className="box-edit">
                   <textarea
                     className="textarea-field"
                     value={draft}
@@ -144,7 +150,6 @@ export function LeechView({
                   <button
                     type="button"
                     className="btn btn-sm btn-primary"
-                    style={{ marginTop: 6 }}
                     onClick={() => {
                       onUpdateMnemonic(c, draft.trim());
                       setEditingGuid(null);
@@ -154,7 +159,7 @@ export function LeechView({
                   </button>
                 </div>
               )}
-            </div>
+            </article>
           );
         })
       )}

@@ -4,13 +4,13 @@
   "description": "Offline-first FSRS flashcard companion for anki-exam-forge (.apkg & deck.json).",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#eff4f9",
-  "theme_color": "#0e3464",
+  "background_color": "#F3F6F9",
+  "theme_color": "#060E1C",
   "icons": [
     {
-      "src": "./icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     }
   ]
 }

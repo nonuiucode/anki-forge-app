@@ -14,9 +14,11 @@
   - **Auto-scheduled MCQs**: After picking a single-choice answer or submitting an X-type multi-select card, FSRS-5 interval grading is computed automatically from verdict (`correct` / `partial` / `wrong`) and response time — no repetitive 4-button rating step required after every MCQ (while Basic & Cloze cards keep the 4-button FSRS bar).
   - **Question & Option Shuffling**: Both deck question queues (with within-tier shuffling in Exam Sprint mode) and MCQ answer choices shuffle cleanly per session (automatically skipping positional-reference options like `"All of the above"` / `"以上均正确"`), displaying original option tags (`原X`) after reveal.
   - **Native Review Reminders**: Daily scheduled Android notifications summarizing due/leech/new cards plus quiet-hour-aware FSRS due reminders that survive device reboots.
-- **Touch Swipe Navigation & UI Polish**:
+- **Touch Swipe Navigation, Pinch-to-Zoom Lightbox & UI Redesign**:
   - Horizontal touch swipe left/right between previous and next cards with vertical-scroll protection and per-session answer preservation (swiping back never double-logs reviews).
-  - Single-choice tap-to-grade and X-type multi-select MCQs (checkbox toggle + submit-to-grade with per-option correct/missed/wrong breakdown, stem-first diagram placement), per-blank peekable Cloze deletions, full-screen `1× / 1.75× / 2.5×` diagram lightbox, 90-day SVG heatmap, and eye-care light/dark UI polish.
+  - Single-choice tap-to-grade and X-type multi-select MCQs (checkbox toggle + submit-to-grade with per-option correct/missed/wrong breakdown, stem-first diagram placement) and per-blank peekable Cloze deletions.
+  - Native-feel full-screen diagram lightbox supporting two-finger pinch-to-zoom (`1×–5×`) anchored at finger midpoint, boundary-clamped panning, double-tap `1× ↔ 2.5×` zoom, vertical drag-down dismiss, and desktop wheel/drag controls.
+  - Understated UI redesign & polish across light/dark eye-care themes, custom switches and segmented controls, 90-day review heatmap, and frequency-tier mastery meters.
 
 ## Cloud APK Compilation (GitHub Actions)
 

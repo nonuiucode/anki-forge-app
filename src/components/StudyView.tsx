@@ -7,7 +7,8 @@ import {
   prepareMcqOptions,
 } from '../engine/mcq';
 import type { FrequencyTier, Rating, StudyCard, StudyMode } from '../types';
-import { AppleCoinMini } from './DeckThemeArt';
+import { AppMark } from './DeckThemeArt';
+import { Icon } from './Icons';
 import { ImageLightbox } from './ImageLightbox';
 
 interface StudyViewProps {
@@ -342,15 +343,17 @@ export function StudyView({
 
   if (!card) {
     return (
-      <div className="card-panel" style={{ textAlign: 'center', padding: '36px 18px' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>这一轮已经刷完了</div>
-        <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 18 }}>
+      <div className="card-panel empty-state">
+        <AppMark size={56} className="empty-mark" />
+        <h2 className="empty-title">这一轮已经刷完了</h2>
+        <p className="empty-desc">
           {deckName} · {modeLabel}
-        </div>
-        <div className="row-wrap" style={{ justifyContent: 'center' }}>
+        </p>
+        <div className="empty-actions is-row">
           {queue.length > 0 && (
             <button type="button" className="btn btn-subtle" onClick={goPrev}>
-              ← 回到上一题
+              <Icon name="chevronLeft" size={18} />
+              回到上一题
             </button>
           )}
           <button type="button" className="btn btn-primary" onClick={onExit}>
@@ -367,7 +370,7 @@ export function StudyView({
     .filter((item): item is { mname: string; src: string } => Boolean(item.src));
 
   const mediaBlock = resolvedMedia.length > 0 ? (
-    <div>
+    <div className="media-figure">
       {resolvedMedia.map(({ mname, src }) => (
         <img
           key={mname}
@@ -377,32 +380,32 @@ export function StudyView({
           onClick={() => setLightboxSrc(src)}
         />
       ))}
-      <div className="media-caption">点击图片可全屏放大查看</div>
+      <div className="media-caption">
+        <Icon name="maximize" size={13} />
+        轻点全屏查看 · 支持双指缩放
+      </div>
     </div>
   ) : null;
 
-  const suitMark =
-    card.cardType === 'basic'
-      ? { glyph: '♥', crimson: true }
-      : card.cardType === 'cloze'
-        ? { glyph: '♣', crimson: false }
-        : mcqEval?.isMulti
-          ? { glyph: '♦', crimson: true }
-          : { glyph: '♠', crimson: false };
-
   return (
     <>
-      <div className="row-between" style={{ padding: '4px 0' }}>
-        <button type="button" className="btn btn-sm btn-subtle" onClick={onExit}>
-          ← 返回
+      <div className="study-top">
+        <button type="button" className="icon-btn" aria-label="返回" onClick={onExit}>
+          <Icon name="arrowLeft" />
         </button>
-        <div style={{ fontSize: 13, fontWeight: 600 }} className="num-tab">
-          {modeLabel} · {cursor + 1} / {queue.length}
+        <div className="study-top-center">
+          <div className="study-mode">
+            {deckName} · {modeLabel}
+          </div>
+          <div className="study-count num-tab">
+            {cursor + 1}
+            <small> / {queue.length}</small>
+          </div>
         </div>
         {mode === 'sprint' ? (
           <select
-            className="select-field"
-            style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }}
+            className="select-field is-pill"
+            aria-label="考点范围"
             value={tierFilter}
             onChange={(e) => onChangeTierFilter(e.target.value as FrequencyTier | 'all')}
           >
@@ -412,13 +415,19 @@ export function StudyView({
             <option value="supplement">课件补充</option>
           </select>
         ) : (
-          <span style={{ width: 52 }} />
+          <span className="study-top-spacer" aria-hidden="true" />
         )}
       </div>
 
-      <div className="progress-track">
+      <div
+        className="progress-rail"
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={queue.length}
+        aria-valuenow={cursor + 1}
+      >
         <div
-          className="progress-fill"
+          className="progress-rail-fill"
           style={{ width: `${Math.round(((cursor + 1) / Math.max(1, queue.length)) * 100)}%` }}
         />
       </div>
@@ -475,29 +484,26 @@ export function StudyView({
         }}
       >
         {dragX > 28 && cursor > 0 && (
-          <div className="swipe-hint left">← 上一题</div>
+          <div className="swipe-hint left">
+            <Icon name="chevronLeft" size={18} />
+            上一题
+          </div>
         )}
         {dragX < -28 && (
           <div className="swipe-hint right">
-            {cursor + 1 >= queue.length ? '完成本轮 →' : '下一题 →'}
+            {cursor + 1 >= queue.length ? '完成本轮' : '下一题'}
+            <Icon name={cursor + 1 >= queue.length ? 'check' : 'chevronRight'} size={18} />
           </div>
         )}
 
         <div
-          className="card-panel"
+          className="card-panel study-card"
           style={{
             transform: dragX !== 0 ? `translateX(${dragX}px)` : undefined,
             transition: dragX === 0 ? 'transform 0.18s ease-out' : 'none',
           }}
         >
-          <span
-            className={`card-suit-mark ${suitMark.crimson ? 'crimson' : ''}`}
-            aria-hidden="true"
-          >
-            {suitMark.glyph}
-          </span>
-
-          <div className="row-wrap">
+          <div className="study-meta">
             {card.frequencyBadge && (
               <span className={`pill ${card.frequencyTier === 'high' ? 'pill-high' : ''}`}>
                 {card.frequencyBadge}
@@ -608,21 +614,20 @@ export function StudyView({
           )}
 
           {!revealed ? (
-            <div style={{ marginTop: 18 }}>
+            <div className="reveal-zone">
               {card.cardType === 'mcq' && mcqEval?.isMulti ? (
                 mcqEval.selectedLetters.length > 0 ? (
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div className="reveal-actions">
                     <button
                       type="button"
-                      className="btn btn-primary"
-                      style={{ flex: 1 }}
+                      className="btn btn-primary btn-lg grow"
                       onClick={() => commitMcqReveal(selectedSet)}
                     >
                       提交判分（已选 {mcqEval.selectedLetters.join('')}）
                     </button>
                     <button
                       type="button"
-                      className="btn btn-subtle"
+                      className="btn btn-subtle btn-lg"
                       onClick={() =>
                         setRecords((prev) => ({
                           ...prev,
@@ -636,8 +641,7 @@ export function StudyView({
                 ) : (
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
+                    className="btn btn-primary btn-lg btn-block"
                     onClick={() => commitMcqReveal(new Set())}
                   >
                     直接显示答案（未勾选）
@@ -646,8 +650,7 @@ export function StudyView({
               ) : (
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  style={{ width: '100%' }}
+                  className="btn btn-primary btn-lg btn-block"
                   onClick={() => {
                     if (card.cardType === 'mcq') {
                       commitMcqReveal(selectedSet);
@@ -706,38 +709,42 @@ export function StudyView({
               {currentRecord.archived && (
                 <div
                   className={`auto-archive-strip ${currentRecord.archived.rating === 1 ? 'lapsed' : ''}`}
+                  role="status"
                 >
-                  <AppleCoinMini size={16} />
-                  <span>
-                    已按记忆曲线自动归档 · 下次复习：{currentRecord.archived.intervalLabel}（{currentRecord.archived.reason}）
-                  </span>
+                  <AppMark size={22} />
+                  <div className="archive-text">
+                    <strong>下次复习 · {currentRecord.archived.intervalLabel}</strong>
+                    <span>已按记忆曲线自动归档 · {currentRecord.archived.reason}</span>
+                  </div>
                 </div>
               )}
 
               {card.explanation && (
                 <div className="study-info-box">
-                  <div className="box-label">解析 / 考点说明</div>
-                  {card.explanation}
+                  <div className="box-label">
+                    <Icon name="info" size={14} />
+                    解析 / 考点说明
+                  </div>
+                  <div>{card.explanation}</div>
                 </div>
               )}
 
               <div className="study-mnemonic-box">
-                <div className="row-between" style={{ marginBottom: 4 }}>
-                  <span className="box-label" style={{ marginBottom: 0 }}>
-                    <AppleCoinMini size={14} />
-                    <span>记忆法助记</span>
+                <div className="box-head">
+                  <span className="box-label">
+                    <Icon name="bulb" size={14} />
+                    记忆法助记
                   </span>
                   <button
                     type="button"
-                    className="btn btn-sm"
-                    style={{ minHeight: 26, fontSize: 12 }}
+                    className="text-btn"
                     onClick={() => setEditingMnemonic(!editingMnemonic)}
                   >
                     {editingMnemonic ? '取消' : card.mnemonic ? '编辑' : '添加助记'}
                   </button>
                 </div>
                 {editingMnemonic ? (
-                  <div style={{ marginTop: 6 }}>
+                  <div className="box-edit">
                     <textarea
                       className="textarea-field"
                       value={mnemonicDraft}
@@ -747,7 +754,6 @@ export function StudyView({
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
-                      style={{ marginTop: 6 }}
                       onClick={() => {
                         onUpdateMnemonic(card, mnemonicDraft.trim());
                         setEditingMnemonic(false);
@@ -759,16 +765,14 @@ export function StudyView({
                 ) : card.mnemonic ? (
                   <div>{card.mnemonic}</div>
                 ) : (
-                  <div style={{ fontSize: 13, opacity: 0.75 }}>
+                  <div className="box-empty">
                     暂无助记；如果反复记不住，可导出卡壳清单交给 AI 生成记忆法后回写。
                   </div>
                 )}
               </div>
 
               {card.sourceYears.length > 0 && (
-                <div className="top-sub" style={{ marginTop: 12 }}>
-                  真题年份 / 来源：{card.sourceYears.join(', ')}
-                </div>
+                <div className="source-line">真题年份 / 来源：{card.sourceYears.join(', ')}</div>
               )}
             </>
           )}
@@ -781,7 +785,7 @@ export function StudyView({
             <strong>重来</strong>
             {showIntervals && <span>{intervals[1].label}</span>}
           </button>
-          <button type="button" className="rate-btn" onClick={() => handleManualRate(2)}>
+          <button type="button" className="rate-btn rate-hard" onClick={() => handleManualRate(2)}>
             <strong>困难</strong>
             {showIntervals && <span>{intervals[2].label}</span>}
           </button>
@@ -789,7 +793,7 @@ export function StudyView({
             <strong>良好</strong>
             {showIntervals && <span>{intervals[3].label}</span>}
           </button>
-          <button type="button" className="rate-btn" onClick={() => handleManualRate(4)}>
+          <button type="button" className="rate-btn rate-easy" onClick={() => handleManualRate(4)}>
             <strong>简单</strong>
             {showIntervals && <span>{intervals[4].label}</span>}
           </button>
@@ -799,19 +803,21 @@ export function StudyView({
       <div className="study-nav-bar">
         <button
           type="button"
-          className="btn btn-sm btn-subtle"
+          className="btn btn-sm btn-ghost"
           disabled={cursor === 0}
           onClick={goPrev}
         >
-          ← 上一题
+          <Icon name="chevronLeft" size={18} />
+          上一题
         </button>
         <span className="study-nav-tip">左右滑动切题</span>
         <button
           type="button"
-          className="btn btn-sm btn-subtle"
+          className="btn btn-sm btn-ghost"
           onClick={goNext}
         >
-          {cursor + 1 >= queue.length ? '完成本轮 ✓' : '下一题 →'}
+          {cursor + 1 >= queue.length ? '完成本轮' : '下一题'}
+          <Icon name={cursor + 1 >= queue.length ? 'check' : 'chevronRight'} size={18} />
         </button>
       </div>
 

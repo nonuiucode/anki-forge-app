@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Render ocean, silver-chip, crimson-apple & poker-suit Android icons and splash PNGs."""
+"""Render Android launcher icons, adaptive foregrounds, background color, and splash PNGs from master artwork."""
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
-import pymupdf
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+BRAND_DIR = REPO_ROOT / "scripts" / "brand-sources"
 RES_DIR = REPO_ROOT / "android" / "app" / "src" / "main" / "res"
+
+APP_ICON_SRC = BRAND_DIR / "app-icon-source.png"
+HERO_DARK_SRC = BRAND_DIR / "hero-dark-source.png"
+LAUNCHER_BG_XML = RES_DIR / "values" / "ic_launcher_background.xml"
 
 ICON_DENSITIES = {
     "mdpi": (48, 108),
@@ -33,127 +39,217 @@ SPLASH_SIZES = {
 }
 
 
-def coin_apple_emblem(cx: float, cy: float, radius: float) -> str:
-    """Return crisp solid/translucent vector SVG group (no gradients for universal rasterizers)."""
-    s = radius / 44.0
-    return f"""
-  <g transform="translate({cx - 64 * s:.2f} {cy - 64 * s:.2f}) scale({s:.4f})">
-    <circle cx="64" cy="64" r="46" fill="none" stroke="#DCE8F5" stroke-width="8" stroke-dasharray="15.5 7"/>
-    <circle cx="64" cy="64" r="38" fill="#0B274D" stroke="#F0F6FC" stroke-width="2"/>
-    <circle cx="64" cy="64" r="32" fill="none" stroke="#6EB0EE" stroke-width="1.2" stroke-dasharray="3.2 4.2" opacity="0.72"/>
-    <path d="M64 16 L67.2 21 L64 26 L60.8 21 Z" fill="#FFFFFF"/>
-    <path d="M64 102 L67.2 107 L64 112 L60.8 107 Z" fill="#FFFFFF"/>
-    <path d="M16 64 L21 60.8 L26 64 L21 67.2 Z" fill="#FFFFFF"/>
-    <path d="M102 64 L107 60.8 L112 64 L107 67.2 Z" fill="#FFFFFF"/>
-    <path d="M64.6 40.5 C65 34.5 68 30.8 71.8 29" fill="none" stroke="#E2ECF7" stroke-width="3.2" stroke-linecap="round"/>
-    <path d="M66.4 36.8 C72.6 32.5 78.6 34.5 79 39.5 C73.6 41 68.8 39.6 66.4 36.8 Z" fill="#5EEAD4"/>
-    <path d="M64 46 C58.6 42 47.6 44.2 45 55.2 C42.3 67.2 49.2 84 57.4 86.2 C60.7 87.1 62.5 85 64 85 C65.5 85 67.3 87.1 70.6 86.2 C78.8 84 85.7 67.2 83 55.2 C80.4 44.2 69.4 42 64 46 Z" fill="#D42F4B" stroke="#FFD6DD" stroke-width="1.5"/>
-    <path d="M64 46 C70 43.2 79.4 46 82 55.2 C84.5 66 78.6 81.5 71 84.8 C74.5 76.5 75.5 60.5 69.2 49.8 C67.6 47.4 65.8 46.5 64 46 Z" fill="#9E1B32" opacity="0.52"/>
-    <ellipse cx="53.6" cy="54.8" rx="3.2" ry="6.6" transform="rotate(-18 53.6 54.8)" fill="#FFFFFF" opacity="0.48"/>
-  </g>"""
+def compute_edge_hex(im: Image.Image) -> str:
+    """Compute average hex color along the outer border of the master icon."""
+    rgb = im.convert("RGB")
+    w, h = rgb.size
+    px = rgb.load()
+    band = max(2, min(w, h) // 50)
+    r_sum = g_sum = b_sum = count = 0
+
+    for y in range(h):
+        if y < band or y >= h - band:
+            xs = range(w)
+        else:
+            xs = list(range(band)) + list(range(w - band, w))
+        for x in xs:
+            r, g, b = px[x, y]
+            r_sum += r
+            g_sum += g
+            b_sum += b
+            count += 1
+
+    r_avg = round(r_sum / count)
+    g_avg = round(g_sum / count)
+    b_avg = round(b_sum / count)
+    return f"#{r_avg:02X}{g_avg:02X}{b_avg:02X}"
 
 
-def render_svg_to_png(svg_markup: str, width: int, height: int, alpha: bool, out_path: Path) -> None:
-    doc = pymupdf.open(stream=svg_markup.encode("utf-8"), filetype="svg")
-    try:
-        page = doc[0]
-        rect = page.rect
-        sx = width / rect.width
-        sy = height / rect.height
-        pix = page.get_pixmap(matrix=pymupdf.Matrix(sx, sy), alpha=alpha)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        pix.save(str(out_path))
-    finally:
-        doc.close()
+def write_launcher_bg_xml(hex_color: str) -> None:
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        "<resources>\n"
+        f'    <color name="ic_launcher_background">{hex_color}</color>\n'
+        "</resources>\n"
+    )
+    LAUNCHER_BG_XML.parent.mkdir(parents=True, exist_ok=True)
+    LAUNCHER_BG_XML.write_text(xml, encoding="utf-8")
+
+
+def make_rounded_mask(size: int, radius: float, supersample: int = 4) -> Image.Image:
+    big = size * supersample
+    mask = Image.new("L", (big, big), 0)
+    draw = ImageDraw.Draw(mask)
+    inset = max(1, round(supersample * 0.5))
+    draw.rounded_rectangle(
+        [inset, inset, big - 1 - inset, big - 1 - inset],
+        radius=radius * supersample,
+        fill=255,
+    )
+    return mask.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def make_circle_mask(size: int, supersample: int = 4) -> Image.Image:
+    big = size * supersample
+    mask = Image.new("L", (big, big), 0)
+    draw = ImageDraw.Draw(mask)
+    inset = max(1, round(supersample * 0.5))
+    draw.ellipse([inset, inset, big - 1 - inset, big - 1 - inset], fill=255)
+    return mask.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def apply_mask_rgba(src: Image.Image, size: int, mask: Image.Image) -> Image.Image:
+    rgba = src.resize((size, size), Image.Resampling.LANCZOS).convert("RGBA")
+    rgba.putalpha(mask)
+    return rgba
+
+
+def crop_medallion_square(app_im: Image.Image) -> Image.Image:
+    """Crop square tightly framing the centered brushed-silver medallion."""
+    w, h = app_im.size
+    # Medallion sits centered at (~50%, ~49.3%) with radius ~24.5% of canvas width.
+    cx = w * 0.499
+    cy = h * 0.493
+    half = w * 0.244
+    box = (
+        max(0, round(cx - half)),
+        max(0, round(cy - half)),
+        min(w, round(cx + half)),
+        min(h, round(cy + half)),
+    )
+    return app_im.crop(box)
+
+
+def build_vignette_overlay(w: int, h: int, strength: float = 0.42) -> Image.Image:
+    """Create a subtle dark radial vignette at low resolution then smoothly upscale."""
+    vw, vh = 160, max(90, round(160 * h / w))
+    ov = Image.new("RGBA", (vw, vh), (0, 0, 0, 0))
+    px = ov.load()
+    cx, cy = (vw - 1) / 2.0, (vh - 1) / 2.0
+    max_d = math.hypot(cx, cy)
+    for y in range(vh):
+        dy = (y - cy) / max_d
+        for x in range(vw):
+            dx = (x - cx) / max_d
+            dist = math.hypot(dx, dy)
+            t = max(0.0, min(1.0, (dist - 0.35) / 0.65))
+            alpha = round(255 * strength * (t * t))
+            px[x, y] = (4, 10, 22, alpha)
+    return ov.resize((w, h), Image.Resampling.BICUBIC)
+
+
+def render_medallion_badge(medallion_sq: Image.Image, diameter: int) -> Image.Image:
+    """Render circular-framed medallion with soft drop shadow and subtle #DCE8F5 ring."""
+    ss = 4
+    pad = max(8, round(diameter * 0.14))
+    canvas_size = diameter + pad * 2
+    big_d = diameter * ss
+    big_pad = pad * ss
+    big_canvas = canvas_size * ss
+
+    # Soft shadow behind medallion
+    shadow = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow)
+    s_off = max(2, round(diameter * 0.025))
+    s_draw.ellipse(
+        [pad, pad + s_off, pad + diameter, pad + diameter + s_off],
+        fill=(3, 8, 18, 130),
+    )
+    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=max(3.0, diameter * 0.055)))
+
+    # Supersampled circular medallion + crisp #DCE8F5 ring
+    ring_px = max(2, round(diameter * 0.014)) * ss
+    inner_d = big_d - ring_px * 2
+
+    badge_big = Image.new("RGBA", (big_canvas, big_canvas), (0, 0, 0, 0))
+    b_draw = ImageDraw.Draw(badge_big)
+    b_draw.ellipse(
+        [big_pad, big_pad, big_pad + big_d - 1, big_pad + big_d - 1],
+        fill=(220, 232, 245, 220),
+    )
+
+    inner_img = medallion_sq.resize((inner_d, inner_d), Image.Resampling.LANCZOS).convert("RGBA")
+    inner_mask = Image.new("L", (inner_d, inner_d), 0)
+    ImageDraw.Draw(inner_mask).ellipse([0, 0, inner_d - 1, inner_d - 1], fill=255)
+    badge_big.paste(inner_img, (big_pad + ring_px, big_pad + ring_px), inner_mask)
+
+    badge = badge_big.resize((canvas_size, canvas_size), Image.Resampling.LANCZOS)
+    return Image.alpha_composite(shadow, badge)
+
+
+def save_optimized_png(im: Image.Image, out_path: Path, quantize: bool = False) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if quantize:
+        # Adaptive 256-color palette keeps high-res splash screens crisp and compact.
+        pal = im.convert("RGB").quantize(
+            colors=256,
+            method=Image.Quantize.FASTOCTREE,
+            dither=Image.Dither.FLOYDSTEINBERG,
+        )
+        pal.save(out_path, format="PNG", optimize=True)
+    else:
+        im.save(out_path, format="PNG", optimize=True)
 
 
 def main() -> None:
+    if not APP_ICON_SRC.exists() or not HERO_DARK_SRC.exists():
+        raise FileNotFoundError(
+            f"Missing brand sources in {BRAND_DIR}; expected {APP_ICON_SRC.name} and {HERO_DARK_SRC.name}."
+        )
+
+    app_src = Image.open(APP_ICON_SRC).convert("RGB")
+    hero_src = Image.open(HERO_DARK_SRC).convert("RGB")
+    medallion_sq = crop_medallion_square(app_src)
+
+    edge_hex = compute_edge_hex(app_src)
+    write_launcher_bg_xml(edge_hex)
+
+    # 1. Android launcher icons (all 5 densities)
     for density, (icon_px, fg_px) in ICON_DENSITIES.items():
-        # Adaptive foreground (transparent background, artwork centered inside 66% safe mask)
-        fg_svg = (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="{fg_px}" height="{fg_px}">'
-            + coin_apple_emblem(54, 54, 31)
-            + "</svg>"
-        )
-        render_svg_to_png(
-            fg_svg,
-            fg_px,
-            fg_px,
-            True,
-            RES_DIR / f"mipmap-{density}" / "ic_launcher_foreground.png",
-        )
+        mip_dir = RES_DIR / f"mipmap-{density}"
 
-        # Rounded-square legacy icon (zero clipPath dependence; inner highlights strictly inside bounds)
-        sq_svg = (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="{icon_px}" height="{icon_px}">'
-            '<rect x="4" y="4" width="120" height="120" rx="28" fill="#0A2447"/>'
-            '<circle cx="64" cy="56" r="46" fill="#134580" opacity="0.52"/>'
-            '<path d="M5 90 Q36 78 64 90 T123 90 L123 96 C123 111 111 123 96 123 L32 123 C17 123 5 111 5 96 Z" fill="#1D62A8" opacity="0.58"/>'
-            '<path d="M8 103 Q40 93 74 103 T120 101 C116 115 107 123 96 123 L32 123 C21 123 12 115 8 103 Z" fill="#3B89D4" opacity="0.30"/>'
-            '<rect x="4" y="4" width="120" height="120" rx="28" fill="none" stroke="#3B79B8" stroke-width="2.5"/>'
-            + coin_apple_emblem(64, 64, 44)
-            + "</svg>"
-        )
-        render_svg_to_png(
-            sq_svg,
-            icon_px,
-            icon_px,
-            True,
-            RES_DIR / f"mipmap-{density}" / "ic_launcher.png",
-        )
+        # Adaptive foreground: full-bleed smooth LANCZOS resize
+        fg = app_src.resize((fg_px, fg_px), Image.Resampling.LANCZOS).convert("RGBA")
+        save_optimized_png(fg, mip_dir / "ic_launcher_foreground.png")
 
-        # Round icon (zero clipPath dependence; waves bounded inside r=59 circle)
-        rnd_svg = (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="{icon_px}" height="{icon_px}">'
-            '<circle cx="64" cy="64" r="60" fill="#0A2447"/>'
-            '<circle cx="64" cy="56" r="46" fill="#134580" opacity="0.52"/>'
-            '<path d="M9 88 Q36 76 64 88 T119 88 A59 59 0 0 1 9 88 Z" fill="#1D62A8" opacity="0.58"/>'
-            '<path d="M18 102 Q44 93 74 102 T110 102 A59 59 0 0 1 18 102 Z" fill="#3B89D4" opacity="0.30"/>'
-            '<circle cx="64" cy="64" r="60" fill="none" stroke="#3B79B8" stroke-width="2.5"/>'
-            + coin_apple_emblem(64, 64, 44)
-            + "</svg>"
-        )
-        render_svg_to_png(
-            rnd_svg,
-            icon_px,
-            icon_px,
-            True,
-            RES_DIR / f"mipmap-{density}" / "ic_launcher_round.png",
-        )
+        # Legacy rounded-square icon (4x supersampled alpha mask)
+        sq_mask = make_rounded_mask(icon_px, radius=icon_px * 0.22, supersample=4)
+        sq_icon = apply_mask_rgba(app_src, icon_px, sq_mask)
+        save_optimized_png(sq_icon, mip_dir / "ic_launcher.png")
 
-    # Splash screens (exact opaque sizes, layered deep ocean waves + drifting card + centered emblem)
+        # Round icon (4x supersampled circular alpha mask)
+        rnd_mask = make_circle_mask(icon_px, supersample=4)
+        rnd_icon = apply_mask_rgba(app_src, icon_px, rnd_mask)
+        save_optimized_png(rnd_icon, mip_dir / "ic_launcher_round.png")
+
+    # 2. Android splash screens (all 11 portrait & landscape sizes)
     for rel_path, (w, h) in SPLASH_SIZES.items():
-        min_dim = min(w, h)
-        emblem_r = min_dim * 0.17
-        wave_y1 = h * 0.71
-        wave_y2 = h * 0.80
-        wave_y3 = h * 0.89
-        dot_r = max(1.8, min_dim * 0.005)
-        card_w = min_dim * 0.165
-        card_h = card_w * 1.38
-        splash_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">
-  <rect width="{w}" height="{h}" fill="#081C38"/>
-  <circle cx="{w*0.5:.1f}" cy="{h*0.44:.1f}" r="{max(w, h)*0.48:.1f}" fill="#0F3464" opacity="0.65"/>
-  <circle cx="{w*0.5:.1f}" cy="{h*0.45:.1f}" r="{min_dim*0.38:.1f}" fill="#174D8A" opacity="0.32"/>
-  <path d="M0 {wave_y1:.1f} Q{w*0.25:.1f} {wave_y1 - min_dim*0.06:.1f} {w*0.5:.1f} {wave_y1:.1f} T{w} {wave_y1:.1f} L{w} {h} L0 {h} Z" fill="#134278" opacity="0.72"/>
-  <path d="M0 {wave_y2:.1f} Q{w*0.28:.1f} {wave_y2 + min_dim*0.05:.1f} {w*0.56:.1f} {wave_y2:.1f} T{w} {wave_y2 - min_dim*0.02:.1f} L{w} {h} L0 {h} Z" fill="#1C5C9E" opacity="0.62"/>
-  <path d="M0 {wave_y3:.1f} Q{w*0.32:.1f} {wave_y3 - min_dim*0.04:.1f} {w*0.64:.1f} {wave_y3:.1f} T{w} {wave_y3 + min_dim*0.02:.1f} L{w} {h} L0 {h} Z" fill="#3B89D4" opacity="0.34"/>
-  <g transform="translate({w*0.76:.1f} {h*0.17:.1f}) rotate(11)" opacity="0.24">
-    <rect x="0" y="0" width="{card_w:.1f}" height="{card_h:.1f}" rx="{card_w*0.12:.1f}" fill="#0D294F" stroke="#DCE8F5" stroke-width="{max(1.5, min_dim*0.004):.1f}"/>
-    <rect x="{card_w*0.08:.1f}" y="{card_h*0.06:.1f}" width="{card_w*0.84:.1f}" height="{card_h*0.88:.1f}" rx="{card_w*0.08:.1f}" fill="none" stroke="#9EC4EB" stroke-width="{max(1.0, min_dim*0.0025):.1f}" stroke-dasharray="5 4"/>
-    <path d="M{card_w*0.5:.1f} {card_h*0.34:.1f} L{card_w*0.62:.1f} {card_h*0.5:.1f} L{card_w*0.5:.1f} {card_h*0.66:.1f} L{card_w*0.38:.1f} {card_h*0.5:.1f} Z" fill="#E2EEFA"/>
-  </g>
-  <g transform="translate({w*0.12:.1f} {h*0.61:.1f}) rotate(-14)" opacity="0.16">
-    <rect x="0" y="0" width="{card_w*0.82:.1f}" height="{card_h*0.82:.1f}" rx="{card_w*0.10:.1f}" fill="#0D294F" stroke="#CFE2F6" stroke-width="{max(1.2, min_dim*0.003):.1f}"/>
-  </g>
-  <circle cx="{w*0.20:.1f}" cy="{h*0.24:.1f}" r="{dot_r:.1f}" fill="#E2EEFA" opacity="0.55"/>
-  <circle cx="{w*0.34:.1f}" cy="{h*0.16:.1f}" r="{dot_r*0.85:.1f}" fill="#9FD0FF" opacity="0.45"/>
-  <circle cx="{w*0.66:.1f}" cy="{h*0.64:.1f}" r="{dot_r:.1f}" fill="#FFFFFF" opacity="0.42"/>
-{coin_apple_emblem(w * 0.5, h * 0.46, emblem_r)}
-</svg>"""
-        render_svg_to_png(splash_svg, w, h, False, RES_DIR / rel_path)
+        # For portrait frames, bias crop toward the calm left-center ocean so no rock edge clips awkwardly.
+        center_x = 0.28 if h > w else 0.5
+        bg = ImageOps.fit(
+            hero_src,
+            (w, h),
+            method=Image.Resampling.LANCZOS,
+            centering=(center_x, 0.5),
+        ).convert("RGBA")
 
-    print(f"Rendered {len(ICON_DENSITIES) * 3} icons and {len(SPLASH_SIZES)} splash screens.")
+        vignette = build_vignette_overlay(w, h, strength=0.44)
+        composed = Image.alpha_composite(bg, vignette)
+
+        # Slightly darken center-top area smoothly so medallion reads crisply
+        min_dim = min(w, h)
+        medallion_d = max(96, round(min_dim * 0.34))
+        badge = render_medallion_badge(medallion_sq, medallion_d)
+        bx = (w - badge.width) // 2
+        by = round(h * 0.46 - badge.height / 2)
+        composed.alpha_composite(badge, (bx, by))
+
+        save_optimized_png(composed.convert("RGB"), RES_DIR / rel_path, quantize=True)
+
+    print(
+        f"Rendered {len(ICON_DENSITIES) * 3} icons, {len(SPLASH_SIZES)} splash screens, "
+        f"and updated ic_launcher_background to {edge_hex}."
+    )
 
 
 if __name__ == "__main__":

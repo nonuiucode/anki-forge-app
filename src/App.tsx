@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DecksView } from './components/DecksView';
-import { SilverAppleLogo } from './components/DeckThemeArt';
+import { AppMark } from './components/DeckThemeArt';
+import { Icon } from './components/Icons';
 import { LeechView } from './components/LeechView';
 import { StatsView } from './components/StatsView';
 import { StudyView } from './components/StudyView';
@@ -64,6 +65,9 @@ export function App() {
   const [sessionId, setSessionId] = useState(1);
   const [sessionQueue, setSessionQueue] = useState<StudyCard[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
+  );
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -103,16 +107,15 @@ export function App() {
   }, [refreshAll]);
 
   useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {
-      const dark =
-        settings.theme === 'dark' ||
-        (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      setSystemDark(mq.matches);
+      const dark = settings.theme === 'dark' || (settings.theme === 'system' && mq.matches);
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', dark ? '#071324' : '#eff4f9');
+      if (meta) meta.setAttribute('content', dark ? '#060E1C' : '#F3F6F9');
     };
     applyTheme();
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener('change', applyTheme);
     return () => mq.removeEventListener('change', applyTheme);
   }, [settings.theme]);
@@ -396,11 +399,7 @@ export function App() {
     return logs.filter((l) => l.reviewedAt >= cutoff).length;
   }, [logs]);
 
-  const isDark =
-    settings.theme === 'dark' ||
-    (settings.theme === 'system' &&
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemDark);
 
   return (
     <div
@@ -415,23 +414,24 @@ export function App() {
     >
       <header className="top-bar">
         <div className="top-brand">
-          <SilverAppleLogo size={34} />
-          <div>
-            <h1 className="top-title">玖记</h1>
-            <div className="top-sub">真题考频 · FSRS 自动归档 · 乱序记忆</div>
-          </div>
+          <AppMark size={28} />
+          <h1 className="top-title">玖记</h1>
         </div>
-        <div className="row-wrap">
+        <div className="top-actions">
           <button
             type="button"
-            className={`btn btn-sm ${settings.reminderEnabled ? 'btn-primary' : 'btn-subtle'}`}
+            className={`chip-btn${settings.reminderEnabled ? ' is-active' : ''}`}
+            aria-label={settings.reminderEnabled ? `复习提醒 ${settings.reminderTime}` : '复习提醒未开启'}
             onClick={() => setTab('stats')}
           >
-            {settings.reminderEnabled ? `提醒 ${settings.reminderTime}` : '提醒'}
+            <Icon name="bell" size={16} />
+            <span>{settings.reminderEnabled ? settings.reminderTime : '提醒'}</span>
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-subtle"
+            className="icon-btn"
+            aria-label={isDark ? '切换到晴海' : '切换到深海'}
+            title={isDark ? '晴海' : '深海'}
             onClick={() =>
               void handleUpdateSettings({
                 ...settings,
@@ -439,12 +439,16 @@ export function App() {
               })
             }
           >
-            {isDark ? '晴海' : '深海'}
+            <Icon name={isDark ? 'sun' : 'moon'} />
           </button>
         </div>
       </header>
 
-      {toast && <div className="toast-banner">{toast}</div>}
+      {toast && (
+        <div key={toast} className="toast-banner" role="status" aria-live="polite">
+          {toast}
+        </div>
+      )}
 
       <main className="page-body">
         {tab === 'decks' && (
@@ -473,6 +477,7 @@ export function App() {
             onExportApkg={(d) => void handleExportApkg(d)}
             onUpdateExamDate={(d, dt) => void handleUpdateExamDate(d, dt)}
             onDeleteDeck={(d) => void handleDeleteDeck(d)}
+            isDark={isDark}
           />
         )}
 
@@ -525,14 +530,18 @@ export function App() {
           <button
             type="button"
             className={`nav-item ${tab === 'decks' ? 'active' : ''}`}
+            aria-current={tab === 'decks' ? 'page' : undefined}
             onClick={() => setTab('decks')}
           >
-            <span className="nav-icon">♠</span>
+            <span className="nav-pill">
+              <Icon name="decks" strokeWidth={tab === 'decks' ? 2 : 1.75} />
+            </span>
             <span>牌组</span>
           </button>
           <button
             type="button"
             className={`nav-item ${tab === 'study' ? 'active' : ''}`}
+            aria-current={tab === 'study' ? 'page' : undefined}
             onClick={() => {
               if (sessionQueue.length > 0) {
                 setTab('study');
@@ -544,23 +553,31 @@ export function App() {
               }
             }}
           >
-            <span className="nav-icon">♦</span>
+            <span className="nav-pill">
+              <Icon name="study" strokeWidth={tab === 'study' ? 2 : 1.75} />
+            </span>
             <span>复习</span>
           </button>
           <button
             type="button"
             className={`nav-item ${tab === 'leech' ? 'active' : ''}`}
+            aria-current={tab === 'leech' ? 'page' : undefined}
             onClick={() => setTab('leech')}
           >
-            <span className="nav-icon">♥</span>
+            <span className="nav-pill">
+              <Icon name="target" strokeWidth={tab === 'leech' ? 2 : 1.75} />
+            </span>
             <span>卡壳本</span>
           </button>
           <button
             type="button"
             className={`nav-item ${tab === 'stats' ? 'active' : ''}`}
+            aria-current={tab === 'stats' ? 'page' : undefined}
             onClick={() => setTab('stats')}
           >
-            <span className="nav-icon">♣</span>
+            <span className="nav-pill">
+              <Icon name="stats" strokeWidth={tab === 'stats' ? 2 : 1.75} />
+            </span>
             <span>统计</span>
           </button>
         </div>
